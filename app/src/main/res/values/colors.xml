@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg">#ECEFF3</color>
+    <color name="surface">#FFFFFF</color>
+    <color name="well">#DFE4EA</color>
+    <color name="ink">#17202C</color>
+    <color name="muted">#566273</color>
+    <color name="line">#CFD6DF</color>
+    <color name="accent">#B01C2E</color>
+    <color name="ok">#1D7449</color>
+    <color name="icon_bg">#B01C2E</color>
+    <bool name="light_bars">true</bool>
+</resources>
