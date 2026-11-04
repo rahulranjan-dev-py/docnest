@@ -6,25 +6,47 @@ on:
   push:
   workflow_dispatch:
 
+permissions:
+  # Lets the first build save the signing key into the repository.
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: 17
 
-      - uses: gradle/actions/setup-gradle@v4
+      # Every build must be signed with the same key, or a new APK won't install over the old one.
+      # The first build makes the key and saves it in the repository; later builds reuse it.
+      - name: Create the signing key (first build only)
+        if: hashFiles('app/docnest-debug.keystore') == ''
+        run: |
+          keytool -genkeypair -keystore app/docnest-debug.keystore -storetype PKCS12 \
+            -storepass android -alias androiddebugkey -keyalg RSA -keysize 2048 \
+            -validity 10000 -dname "CN=DocNest"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/docnest-debug.keystore
+          git commit -m "Add the fixed signing key for DocNest builds"
+          git push origin HEAD:${{ github.ref_name }}
+
+      # v5, not v6: v6 moved its caching into a closed-source part with separate terms of use.
+      - uses: gradle/actions/setup-gradle@v5
         with:
           gradle-version: 8.14.3
 
       - name: Build the APK
-        run: gradle assembleDebug
+        run: |
+          gradle assembleDebug
+          cp app/build/outputs/apk/debug/app-debug.apk DocNest.apk
 
-      - uses: actions/upload-artifact@v4
+      # Uploaded as the .apk itself, not a zip, so a phone can install it straight after downloading.
+      - uses: actions/upload-artifact@v7
         with:
-          name: DocNest-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: DocNest.apk
+          archive: false

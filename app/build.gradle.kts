@@ -18,6 +18,21 @@ android {
         versionName = "1.0"
     }
 
+    // The same key for every build, so a new APK installs over the old one and keeps its photos.
+    // GitHub's first build creates the key (see .github/workflows/build-apk.yml).
+    signingConfigs {
+        getByName("debug") {
+            val key = file("docnest-debug.keystore")
+            if (key.exists()) {
+                storeFile = key
+                storeType = "pkcs12"
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false

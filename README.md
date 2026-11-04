@@ -35,11 +35,13 @@ GitHub builds the APK for free on its own computers. You only need a GitHub acco
    paste in the contents of that file from this folder, and click **Commit changes**.
 4. Open the **Actions** tab. A "Build APK" run starts by itself and takes about 5–10 minutes. A green
    tick means it worked. A red cross means it failed: open it to read the error.
-5. Click the finished run, scroll to **Artifacts** and download **DocNest-apk**. It is a zip
-   file: open it to get `app-debug.apk`, then install it as described below.
+5. Click the finished run, scroll to **Artifacts** and download **DocNest.apk**. You can do this
+   straight from your phone's browser (signed in to GitHub) and then tap the file to install it.
 
-Each online build is signed with a new key, so installing a newer build over the old one fails with
-"App not installed". Send the day's PDF first, then uninstall the old app and install the new one.
+Every build is signed with the same key, so a new version installs over the old one and keeps your
+photos. GitHub's first build creates this key and saves it in the repository as
+`app/docnest-debug.keystore`. It is a testing key: before sharing DocNest widely, replace it with a
+private release key.
 
 ## Or build the app in Android Studio (on this computer)
 
@@ -90,6 +92,5 @@ Each online build is signed with a new key, so installing a newer build over the
 
 ## Updating the app later
 
-Build again and install the new APK over the old one; today's photos are kept. If you ever build on a
-different computer, uninstall the old app from the phone first, because the two builds are signed
-differently.
+Build again and install the new APK over the old one; your photos are kept. Android Studio builds use
+the same key as GitHub's, as long as `app/docnest-debug.keystore` is in the project folder.
