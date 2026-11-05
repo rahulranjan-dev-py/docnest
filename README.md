@@ -3,18 +3,18 @@
 A free, ad-free document scanner for Android. Photograph your pages and DocNest puts them together
 into a PDF.
 
-- **Fast camera.** Tap the button (or a volume button) again and again: there is no ✓ / ✗ screen
-  between shots. Tap **Done** when finished.
-- **Add from gallery.** Photos are sorted by the time they were taken, with a warning for photos from
-  an earlier day.
-- **Check before you make the PDF.** Rotate, move or remove any photo (with Undo). Tap a photo to see
-  it large.
-- **PDF settings.** File size, colour or black & white, A4 or photo-size pages, file name, and an
-  optional footer with the date and page numbers.
+- **Fast camera.** Tap **Scan**, then the shutter (or a volume button) again and again: there is no
+  ✓ / ✗ screen between shots. Tap **Done** when finished.
+- **Add photos** from your gallery. They are sorted by the time they were taken, with a note if any
+  were taken before today.
+- **Check before you make the PDF.** Hold a page and drag it to reorder. Rotate or delete it (with
+  Undo). Tap a page to see it large.
+- **PDF settings** (the sliders button at the top). Quality, colour or black & white, A4 or
+  photo-size pages, file name, and an optional footer with the date and page numbers.
 - **Share anywhere.** After **Make PDF**, the file is saved in **Downloads** and the share screen
   opens, so you can send it on WhatsApp, Gmail or any other app.
-- **Private and offline.** No account, no internet, no ads. Photos stay on the phone until you tap
-  **New batch**.
+- **Private and offline.** No account, no internet, no ads. Pages stay on the phone until you tap
+  **Clear**.
 
 For now the whole photo always goes into the PDF, uncropped. Automatic edge detection, which you will
 be able to switch on or off, is planned.
@@ -69,13 +69,14 @@ private release key.
 
 ## How to use
 
-1. Tap **Camera** and shoot your pages, one after another. Fit each page inside the frame; what you
-   see on screen is exactly what goes into the PDF. Tap the screen to focus. **Light** turns on the
-   torch for dim rooms.
-2. Tap **Done**. Check the photos: rotate, move or remove any of them. Tap a photo to see it large.
+1. Tap **Scan** and shoot your pages, one after another. Fit each page inside the frame; what you
+   see on screen is exactly what goes into the PDF. Tap the screen to focus. The lightning button
+   turns on the torch for dim rooms.
+2. Tap **Done**. Check the pages: hold and drag to reorder, rotate or delete. Tap a page to see it
+   large.
 3. Tap **Make PDF**. It is saved in Downloads and the share screen opens: choose WhatsApp, Gmail or
    any other app. Tap **Share PDF** to send it again.
-4. When you are finished, tap **New batch** to clear the photos.
+4. When you are finished, tap **Clear** to start a new batch.
 
 ---
 

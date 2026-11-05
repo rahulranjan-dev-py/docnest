@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The manila index tab that numbers each page; the card clips its top-left corner. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/secondary_container" />
+    <corners android:bottomRightRadius="10dp" />
+</shape>

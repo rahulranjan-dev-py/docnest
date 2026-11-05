@@ -1,25 +1,101 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="SettingsLabel">
-        <item name="android:layout_width">wrap_content</item>
-        <item name="android:layout_height">wrap_content</item>
-        <item name="android:layout_marginTop">16dp</item>
-        <item name="android:layout_marginBottom">6dp</item>
-        <item name="android:textColor">@color/muted</item>
-        <item name="android:textSize">12sp</item>
+    <!-- The app name: condensed and heavy, like a label on a folder. -->
+    <style name="TextAppearance.DocNest.Brand" parent="TextAppearance.Material3.HeadlineSmall">
+        <item name="fontFamily">sans-serif-condensed</item>
+        <item name="android:fontFamily">sans-serif-condensed</item>
         <item name="android:textStyle">bold</item>
-        <item name="android:letterSpacing">0.09</item>
+        <item name="android:textSize">28sp</item>
+        <item name="android:letterSpacing">-0.01</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
     </style>
 
-    <style name="SettingsChoice" parent="Widget.Material3.Button.OutlinedButton">
+    <!-- Page numbers on the manila tabs. -->
+    <style name="TextAppearance.DocNest.Tab" parent="TextAppearance.Material3.LabelLarge">
+        <item name="fontFamily">sans-serif-condensed</item>
+        <item name="android:fontFamily">sans-serif-condensed</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textColor">?attr/colorOnSecondaryContainer</item>
+    </style>
+
+    <!-- The two big buttons at the bottom of the main screen. -->
+    <style name="Widget.DocNest.DockButton" parent="Widget.Material3.Button">
+        <item name="android:layout_height">56dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:maxLines">1</item>
+        <item name="cornerRadius">16dp</item>
+        <item name="iconGravity">textStart</item>
+    </style>
+
+    <style name="Widget.DocNest.DockButton.Tonal" parent="Widget.Material3.Button.TonalButton">
+        <item name="android:layout_height">56dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:maxLines">1</item>
+        <item name="cornerRadius">16dp</item>
+        <item name="iconGravity">textStart</item>
+    </style>
+
+    <!-- One choice in a settings row; the selected one turns manila. -->
+    <style name="Widget.DocNest.Segment" parent="Widget.Material3.Button.OutlinedButton">
         <item name="android:layout_width">0dp</item>
-        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_height">48dp</item>
         <item name="android:layout_weight">1</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
         <item name="android:paddingStart">4dp</item>
         <item name="android:paddingEnd">4dp</item>
-        <item name="android:maxLines">2</item>
-        <item name="android:textSize">13sp</item>
-        <item name="android:textColor">@color/ink</item>
-        <item name="strokeColor">@color/line</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textColor">@color/segment_text</item>
+        <item name="strokeColor">?attr/colorOutline</item>
+    </style>
+
+    <style name="Widget.DocNest.IconButton" parent="Widget.Material3.Button.IconButton">
+        <item name="iconTint">?attr/colorOnSurfaceVariant</item>
+        <item name="iconSize">22dp</item>
+    </style>
+
+    <!-- Settings sheet -->
+    <style name="Widget.DocNest.SettingTitle" parent="">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">20dp</item>
+        <item name="android:layout_marginBottom">8dp</item>
+        <item name="android:textAppearance">?attr/textAppearanceTitleSmall</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
+    </style>
+
+    <style name="Widget.DocNest.SettingHint" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">6dp</item>
+        <item name="android:textAppearance">?attr/textAppearanceBodySmall</item>
+        <item name="android:textColor">?attr/colorOnSurfaceVariant</item>
+    </style>
+
+    <style name="ShapeAppearance.DocNest.Thumb" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">10dp</item>
+    </style>
+
+    <!-- Labelled icon buttons along the bottom of the photo viewer. -->
+    <style name="Widget.DocNest.ViewerAction" parent="Widget.Material3.Button.TextButton">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">64dp</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:textSize">12sp</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
+        <item name="android:maxLines">1</item>
+        <item name="iconGravity">top</item>
+        <item name="iconPadding">4dp</item>
+        <item name="iconTint">?attr/colorOnSurface</item>
     </style>
 </resources>

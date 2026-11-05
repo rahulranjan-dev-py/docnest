@@ -3,7 +3,9 @@ package com.docnest.app
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
 import android.graphics.Bitmap
+import android.graphics.Color
 import android.os.Bundle
 import android.util.Size
 import android.view.KeyEvent
@@ -66,7 +68,7 @@ class CameraActivity : AppCompatActivity() {
         if (granted) {
             startCamera()
         } else {
-            Toast.makeText(this, "Allow the camera to take photos.", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Allow camera access to scan pages.", Toast.LENGTH_LONG).show()
             finish()
         }
     }
@@ -104,11 +106,8 @@ class CameraActivity : AppCompatActivity() {
         shutter.isEnabled = false
         shutter.setOnClickListener { shoot() }
         findViewById<View>(R.id.doneBtn).setOnClickListener { close() }
-        torchBtn.setOnClickListener {
-            torchOn = !torchOn
-            camera?.cameraControl?.enableTorch(torchOn)
-            torchBtn.text = if (torchOn) "Light on" else "Light off"
-        }
+        findViewById<View>(R.id.closeBtn).setOnClickListener { close() }
+        torchBtn.setOnClickListener { setTorch(!torchOn) }
         preview.setOnTouchListener { v, e ->
             if (e.action == MotionEvent.ACTION_UP) {
                 focusAt(e.x, e.y)
@@ -178,9 +177,17 @@ class CameraActivity : AppCompatActivity() {
                 imageCapture = ic
                 shutter.isEnabled = !closing
             } catch (e: Exception) {
-                status.text = "The camera could not be opened."
+                status.text = "The camera couldn't start. Close DocNest and open it again."
             }
         }, ContextCompat.getMainExecutor(this))
+    }
+
+    private fun setTorch(on: Boolean) {
+        torchOn = on
+        camera?.cameraControl?.enableTorch(on)
+        torchBtn.contentDescription = if (on) "Turn light off" else "Turn light on"
+        torchBtn.backgroundTintList = ColorStateList.valueOf(if (on) Color.WHITE else Color.TRANSPARENT)
+        torchBtn.iconTint = ColorStateList.valueOf(if (on) Color.BLACK else Color.WHITE)
     }
 
     private fun focusAt(x: Float, y: Float) {
@@ -226,11 +233,11 @@ class CameraActivity : AppCompatActivity() {
             batch.save()
             added++
             lastThumb.setImageBitmap(thumb)
-            status.text = "Keep going, or tap Done when finished"
+            status.text = "Keep going, or tap Done when you're finished"
             setResult(RESULT_OK, Intent().putExtra(EXTRA_ADDED, added))
         } else {
             batch.deleteFiles(p)
-            status.text = "A photo could not be saved. Take it again."
+            status.text = "That photo didn't save. Take it again."
         }
         updateCount()
         if (closing && pending == 0) finish()
@@ -238,7 +245,7 @@ class CameraActivity : AppCompatActivity() {
 
     private fun updateCount() {
         val n = batch.items.size
-        countText.text = "$n in batch" + if (pending > 0) " · saving $pending" else ""
+        countText.text = pages(n) + if (pending > 0) ", saving $pending" else ""
     }
 
     // Waits for photos still being saved, then goes back to the batch.

@@ -1,0 +1,192 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="24dp"
+        android:paddingEnd="24dp"
+        android:paddingBottom="24dp">
+
+        <com.google.android.material.bottomsheet.BottomSheetDragHandleView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:accessibilityHeading="true"
+            android:text="PDF Settings"
+            android:textAppearance="?attr/textAppearanceTitleLarge"
+            android:textColor="?attr/colorOnSurface" />
+
+        <TextView
+            style="@style/Widget.DocNest.SettingTitle"
+            android:text="Quality" />
+
+        <com.google.android.material.button.MaterialButtonToggleGroup
+            android:id="@+id/qualityGroup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:selectionRequired="true"
+            app:singleSelection="true">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/qSmall"
+                style="@style/Widget.DocNest.Segment"
+                android:text="Small" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/qStandard"
+                style="@style/Widget.DocNest.Segment"
+                android:text="Standard" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/qHigh"
+                style="@style/Widget.DocNest.Segment"
+                android:text="High" />
+        </com.google.android.material.button.MaterialButtonToggleGroup>
+
+        <TextView
+            android:id="@+id/qualityHint"
+            style="@style/Widget.DocNest.SettingHint" />
+
+        <TextView
+            style="@style/Widget.DocNest.SettingTitle"
+            android:text="Colour" />
+
+        <com.google.android.material.button.MaterialButtonToggleGroup
+            android:id="@+id/colorGroup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:selectionRequired="true"
+            app:singleSelection="true">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/cColour"
+                style="@style/Widget.DocNest.Segment"
+                android:text="Colour" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/cGrey"
+                style="@style/Widget.DocNest.Segment"
+                android:text="Black &amp; white" />
+        </com.google.android.material.button.MaterialButtonToggleGroup>
+
+        <TextView
+            android:id="@+id/colourHint"
+            style="@style/Widget.DocNest.SettingHint" />
+
+        <TextView
+            style="@style/Widget.DocNest.SettingTitle"
+            android:text="Page size" />
+
+        <com.google.android.material.button.MaterialButtonToggleGroup
+            android:id="@+id/pageGroup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:selectionRequired="true"
+            app:singleSelection="true">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/pA4"
+                style="@style/Widget.DocNest.Segment"
+                android:text="A4" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/pPhoto"
+                style="@style/Widget.DocNest.Segment"
+                android:text="Fit to photo" />
+        </com.google.android.material.button.MaterialButtonToggleGroup>
+
+        <TextView
+            android:id="@+id/pageHint"
+            style="@style/Widget.DocNest.SettingHint" />
+
+        <TextView
+            style="@style/Widget.DocNest.SettingTitle"
+            android:text="File name" />
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/nameBox"
+            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:suffixText=".pdf">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/nameIn"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:imeOptions="actionDone"
+                android:inputType="text"
+                android:singleLine="true" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="16dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Page footer"
+                    android:textAppearance="?attr/textAppearanceTitleSmall"
+                    android:textColor="?attr/colorOnSurface" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Adds the date and page numbers to each page."
+                    android:textAppearance="?attr/textAppearanceBodySmall"
+                    android:textColor="?attr/colorOnSurfaceVariant" />
+            </LinearLayout>
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/footOn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:contentDescription="Page footer" />
+        </LinearLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/footBox"
+            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:hint="Footer text (optional)"
+            app:helperText="English letters, numbers and punctuation only.">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/footIn"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:imeOptions="actionDone"
+                android:inputType="text"
+                android:singleLine="true" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/doneBtn"
+            style="@style/Widget.DocNest.DockButton"
+            android:layout_width="match_parent"
+            android:layout_marginTop="24dp"
+            android:text="Done" />
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>

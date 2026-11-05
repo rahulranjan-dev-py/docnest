@@ -1,12 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="bg">#0F141A</color>
-    <color name="surface">#18202A</color>
-    <color name="well">#0B0F14</color>
-    <color name="ink">#E6EAEF</color>
-    <color name="muted">#98A4B3</color>
-    <color name="line">#2B3542</color>
-    <color name="accent">#D8394C</color>
-    <color name="ok">#4FC58C</color>
+    <color name="primary">#B8C3FF</color>
+    <color name="on_primary">#142272</color>
+    <color name="primary_container">#2B3A8F</color>
+    <color name="on_primary_container">#DDE2FF</color>
+    <color name="primary_inverse">#3346A8</color>
+
+    <color name="secondary">#E3C77C</color>
+    <color name="on_secondary">#3D2E06</color>
+    <color name="secondary_container">#5A4710</color>
+    <color name="on_secondary_container">#F6E5B5</color>
+
+    <color name="background">#11141B</color>
+    <color name="surface">#11141B</color>
+    <color name="surface_lowest">#0C0F15</color>
+    <color name="surface_low">#171B23</color>
+    <color name="surface_mid">#1B1F28</color>
+    <color name="surface_high">#252A34</color>
+    <color name="surface_highest">#30353F</color>
+    <color name="surface_inverse">#E3E6ED</color>
+    <color name="on_surface_inverse">#2B303B</color>
+    <color name="on_surface">#E3E6ED</color>
+    <color name="on_surface_variant">#A9B0BE</color>
+    <color name="outline">#7D8596</color>
+    <color name="outline_variant">#3A404C</color>
+
+    <color name="error">#F2B8B5</color>
+    <color name="on_error">#601410</color>
+    <color name="error_container">#8C1D18</color>
+    <color name="on_error_container">#F9DEDC</color>
+
+    <color name="page_well">#252A34</color>
     <bool name="light_bars">false</bool>
 </resources>

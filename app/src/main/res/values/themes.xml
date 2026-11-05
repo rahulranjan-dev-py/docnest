@@ -1,31 +1,77 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.DocNest" parent="Theme.Material3.DayNight.NoActionBar">
-        <item name="colorPrimary">@color/accent</item>
-        <item name="colorOnPrimary">#FFFFFF</item>
-        <item name="colorSecondary">@color/accent</item>
+    <!-- Every Material colour role is set, so no default lavender leaks into dialogs or toggles. -->
+    <style name="Base.Theme.DocNest" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorOnPrimary">@color/on_primary</item>
+        <item name="colorPrimaryContainer">@color/primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/on_primary_container</item>
+        <item name="colorPrimaryInverse">@color/primary_inverse</item>
+        <item name="colorSecondary">@color/secondary</item>
+        <item name="colorOnSecondary">@color/on_secondary</item>
+        <item name="colorSecondaryContainer">@color/secondary_container</item>
+        <item name="colorOnSecondaryContainer">@color/on_secondary_container</item>
+        <item name="colorTertiary">@color/secondary</item>
+        <item name="colorOnTertiary">@color/on_secondary</item>
+        <item name="colorTertiaryContainer">@color/secondary_container</item>
+        <item name="colorOnTertiaryContainer">@color/on_secondary_container</item>
+        <item name="android:colorBackground">@color/background</item>
+        <item name="colorOnBackground">@color/on_surface</item>
         <item name="colorSurface">@color/surface</item>
-        <item name="colorOnSurface">@color/ink</item>
-        <item name="colorOutline">@color/line</item>
-        <item name="android:colorBackground">@color/bg</item>
-        <item name="android:windowBackground">@color/bg</item>
-        <item name="android:statusBarColor">@color/bg</item>
+        <item name="colorOnSurface">@color/on_surface</item>
+        <item name="colorSurfaceVariant">@color/surface_highest</item>
+        <item name="colorOnSurfaceVariant">@color/on_surface_variant</item>
+        <item name="colorSurfaceContainerLowest">@color/surface_lowest</item>
+        <item name="colorSurfaceContainerLow">@color/surface_low</item>
+        <item name="colorSurfaceContainer">@color/surface_mid</item>
+        <item name="colorSurfaceContainerHigh">@color/surface_high</item>
+        <item name="colorSurfaceContainerHighest">@color/surface_highest</item>
+        <item name="colorSurfaceInverse">@color/surface_inverse</item>
+        <item name="colorOnSurfaceInverse">@color/on_surface_inverse</item>
+        <item name="colorOutline">@color/outline</item>
+        <item name="colorOutlineVariant">@color/outline_variant</item>
+        <item name="colorError">@color/error</item>
+        <item name="colorOnError">@color/on_error</item>
+        <item name="colorErrorContainer">@color/error_container</item>
+        <item name="colorOnErrorContainer">@color/on_error_container</item>
+
+        <item name="android:windowBackground">@color/background</item>
+        <item name="android:statusBarColor">@color/background</item>
         <item name="android:windowLightStatusBar">@bool/light_bars</item>
+        <item name="android:navigationBarColor">@color/surface_mid</item>
+        <item name="bottomSheetDialogTheme">@style/ThemeOverlay.DocNest.BottomSheet</item>
     </style>
 
-    <!-- Full-screen photo viewer dialog. -->
-    <style name="Theme.DocNest.Viewer" parent="Theme.Material3.Dark.NoActionBar">
-        <item name="colorPrimary">@color/accent</item>
-        <item name="colorOnPrimary">#FFFFFF</item>
-        <item name="android:windowIsFloating">false</item>
-        <item name="android:windowBackground">@android:color/transparent</item>
+    <!-- values-v27 adds dark navigation-bar icons on light backgrounds. -->
+    <style name="Theme.DocNest" parent="Base.Theme.DocNest" />
+
+    <style name="ThemeOverlay.DocNest.BottomSheet" parent="ThemeOverlay.Material3.BottomSheetDialog">
+        <item name="bottomSheetStyle">@style/Widget.DocNest.BottomSheet</item>
+        <item name="android:windowSoftInputMode">adjustResize</item>
     </style>
 
-    <style name="Theme.DocNest.Camera" parent="Theme.Material3.Dark.NoActionBar">
-        <item name="colorPrimary">@color/accent</item>
-        <item name="colorOnPrimary">#FFFFFF</item>
+    <style name="Widget.DocNest.BottomSheet" parent="Widget.Material3.BottomSheet.Modal">
+        <item name="backgroundTint">@color/surface_low</item>
+    </style>
+
+    <!-- Camera and photo viewer: always dark, whatever the phone's theme. -->
+    <style name="Theme.DocNest.Dark" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="colorPrimary">#B8C3FF</item>
+        <item name="colorOnPrimary">#142272</item>
+        <item name="colorSecondaryContainer">#30353F</item>
+        <item name="colorOnSecondaryContainer">#E3E6ED</item>
+        <item name="colorSurface">#000000</item>
+        <item name="colorOnSurface">#E3E6ED</item>
+        <item name="colorOnSurfaceVariant">#A9B0BE</item>
+        <item name="colorError">#F2B8B5</item>
         <item name="android:windowBackground">#000000</item>
         <item name="android:statusBarColor">#000000</item>
         <item name="android:navigationBarColor">#000000</item>
+    </style>
+
+    <style name="Theme.DocNest.Camera" parent="Theme.DocNest.Dark" />
+
+    <style name="Theme.DocNest.Viewer" parent="Theme.DocNest.Dark">
+        <item name="android:windowIsFloating">false</item>
     </style>
 </resources>

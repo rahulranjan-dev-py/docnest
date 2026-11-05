@@ -3,22 +3,50 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/root"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="?android:attr/colorBackground">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-        <!-- Header -->
+        <!-- Top bar -->
         <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="64dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="20dp"
+            android:paddingEnd="8dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:accessibilityHeading="true"
+                android:text="@string/app_name"
+                android:textAppearance="@style/TextAppearance.DocNest.Brand" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/settingsBtn"
+                style="@style/Widget.DocNest.IconButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:contentDescription="PDF settings"
+                app:icon="@drawable/ic_tune" />
+        </LinearLayout>
+
+        <!-- Batch header, shown once there are pages -->
+        <LinearLayout
+            android:id="@+id/listHeader"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingStart="16dp"
-            android:paddingTop="16dp"
-            android:paddingEnd="8dp">
+            android:paddingStart="20dp"
+            android:paddingEnd="8dp"
+            android:visibility="gone">
 
             <LinearLayout
                 android:layout_width="0dp"
@@ -27,88 +55,27 @@
                 android:orientation="vertical">
 
                 <TextView
+                    android:id="@+id/countText"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="DocNest"
-                    android:textColor="@color/ink"
-                    android:textSize="26sp"
-                    android:textStyle="bold" />
+                    android:textAppearance="?attr/textAppearanceTitleMedium"
+                    android:textColor="?attr/colorOnSurface" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Hold a page and drag to reorder"
+                    android:textAppearance="?attr/textAppearanceBodySmall"
+                    android:textColor="?attr/colorOnSurfaceVariant" />
             </LinearLayout>
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/settingsBtn"
-                style="@style/Widget.Material3.Button.TextButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Settings" />
-        </LinearLayout>
-
-        <!-- Capture buttons -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:paddingStart="16dp"
-            android:paddingTop="14dp"
-            android:paddingEnd="16dp">
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/cameraBtn"
-                android:layout_width="0dp"
-                android:layout_height="58dp"
-                android:layout_marginEnd="6dp"
-                android:layout_weight="1"
-                android:text="Camera"
-                android:textSize="16sp"
-                app:cornerRadius="10dp"
-                app:icon="@drawable/ic_camera"
-                app:iconGravity="textStart" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/galleryBtn"
-                style="@style/Widget.Material3.Button.OutlinedButton"
-                android:layout_width="0dp"
-                android:layout_height="58dp"
-                android:layout_marginStart="6dp"
-                android:layout_weight="1"
-                android:text="From gallery"
-                android:textColor="@color/ink"
-                android:textSize="16sp"
-                app:cornerRadius="10dp"
-                app:icon="@drawable/ic_photos"
-                app:iconGravity="textStart"
-                app:iconTint="@color/ink"
-                app:strokeColor="@color/line" />
-        </LinearLayout>
-
-        <!-- Tally -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:paddingStart="16dp"
-            android:paddingTop="10dp"
-            android:paddingEnd="8dp">
-
-            <TextView
-                android:id="@+id/countText"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="0 photos in this batch"
-                android:textColor="@color/ink"
-                android:textSize="17sp"
-                android:textStyle="bold" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/clearBtn"
                 style="@style/Widget.Material3.Button.TextButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="New batch"
-                android:textColor="@color/muted"
-                android:visibility="gone" />
+                android:text="Clear"
+                android:textColor="?attr/colorOnSurfaceVariant" />
         </LinearLayout>
 
         <FrameLayout
@@ -121,66 +88,127 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:clipToPadding="false"
-                android:padding="10dp" />
+                android:paddingStart="14dp"
+                android:paddingTop="8dp"
+                android:paddingEnd="14dp"
+                android:paddingBottom="16dp" />
 
-            <TextView
+            <!-- Empty batch -->
+            <LinearLayout
                 android:id="@+id/empty"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_margin="16dp"
-                android:lineSpacingExtra="4dp"
-                android:text="No photos yet.\n\n1.  Tap Camera and shoot your pages one after another. No ✓ / ✗ between shots.\n\n2.  Check the order. Rotate, move or remove any photo. Tap a photo to see it large.\n\n3.  Tap Make PDF. It is saved in Downloads and you can share it on WhatsApp, Gmail or any other app."
-                android:textColor="@color/muted"
-                android:textSize="15sp" />
+                android:layout_gravity="center"
+                android:gravity="center_horizontal"
+                android:orientation="vertical"
+                android:paddingStart="40dp"
+                android:paddingEnd="40dp"
+                android:paddingBottom="24dp">
+
+                <ImageView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/art_empty_pages" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="20dp"
+                    android:text="No pages yet"
+                    android:textAppearance="?attr/textAppearanceTitleLarge"
+                    android:textColor="?attr/colorOnSurface" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:gravity="center"
+                    android:text="Scan pages one after another or add photos, then make them into a PDF."
+                    android:textAppearance="?attr/textAppearanceBodyLarge"
+                    android:textColor="?attr/colorOnSurfaceVariant" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:gravity="center"
+                    android:text="Tip: the volume buttons take a photo too."
+                    android:textAppearance="?attr/textAppearanceBodySmall"
+                    android:textColor="?attr/colorOnSurfaceVariant" />
+            </LinearLayout>
         </FrameLayout>
 
-        <!-- Bottom bar -->
+        <!-- Dock: progress while busy, then the actions. The main action changes with the batch. -->
         <LinearLayout
-            android:id="@+id/bar"
+            android:id="@+id/dock"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@color/surface"
-            android:elevation="6dp"
+            android:background="@drawable/bg_dock"
             android:orientation="vertical"
             android:paddingStart="16dp"
-            android:paddingTop="10dp"
+            android:paddingTop="16dp"
             android:paddingEnd="16dp"
-            android:paddingBottom="10dp">
+            android:paddingBottom="16dp">
+
+            <LinearLayout
+                android:id="@+id/statusRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="14dp"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/statusText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:accessibilityLiveRegion="polite"
+                    android:textAppearance="?attr/textAppearanceBodyMedium"
+                    android:textColor="?attr/colorOnSurface" />
+
+                <com.google.android.material.progressindicator.LinearProgressIndicator
+                    android:id="@+id/progress"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:max="1000"
+                    app:trackCornerRadius="4dp"
+                    app:trackThickness="6dp" />
+            </LinearLayout>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/makeBtn"
+                style="@style/Widget.DocNest.DockButton"
+                android:layout_width="match_parent"
+                android:layout_marginBottom="10dp"
+                android:text="Make PDF"
+                android:visibility="gone"
+                app:icon="@drawable/ic_pdf" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:gravity="center_vertical"
                 android:orientation="horizontal">
 
-                <TextView
-                    android:id="@+id/msg"
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/galleryBtn"
+                    style="@style/Widget.DocNest.DockButton.Tonal"
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="12dp"
+                    android:layout_marginEnd="5dp"
                     android:layout_weight="1"
-                    android:text="Add photos to start."
-                    android:textColor="@color/ink"
-                    android:textSize="14sp" />
+                    android:text="Add photos"
+                    app:icon="@drawable/ic_photos" />
 
                 <com.google.android.material.button.MaterialButton
-                    android:id="@+id/makeBtn"
-                    android:layout_width="wrap_content"
-                    android:layout_height="54dp"
-                    android:enabled="false"
-                    android:minWidth="140dp"
-                    android:text="Make PDF"
-                    android:textSize="16sp"
-                    app:cornerRadius="10dp" />
+                    android:id="@+id/cameraBtn"
+                    style="@style/Widget.DocNest.DockButton"
+                    android:layout_width="0dp"
+                    android:layout_marginStart="5dp"
+                    android:layout_weight="1"
+                    android:text="Scan"
+                    app:icon="@drawable/ic_camera" />
             </LinearLayout>
-
-            <com.google.android.material.progressindicator.LinearProgressIndicator
-                android:id="@+id/progress"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:max="1000"
-                android:visibility="gone" />
         </LinearLayout>
     </LinearLayout>
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

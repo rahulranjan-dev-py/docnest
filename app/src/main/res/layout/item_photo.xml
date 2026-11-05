@@ -5,20 +5,20 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_margin="6dp"
-    app:cardBackgroundColor="@color/surface"
-    app:cardCornerRadius="12dp"
-    app:strokeColor="@color/line">
+    app:cardBackgroundColor="?attr/colorSurfaceContainerLowest"
+    app:cardCornerRadius="14dp"
+    app:strokeColor="?attr/colorOutlineVariant">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical">
 
-        <com.docnest.app.SquareFrameLayout
+        <com.docnest.app.PageFrameLayout
             android:id="@+id/thumbBox"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@color/well"
+            android:background="@color/page_well"
             android:foreground="?attr/selectableItemBackground">
 
             <ImageView
@@ -26,69 +26,52 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:importantForAccessibility="no"
+                android:padding="8dp"
                 android:scaleType="fitCenter" />
 
             <TextView
-                android:id="@+id/badge"
+                android:id="@+id/tab"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_margin="7dp"
-                android:background="@drawable/badge"
-                android:fontFamily="monospace"
-                android:paddingStart="7dp"
+                android:layout_gravity="top|start"
+                android:background="@drawable/bg_tab"
+                android:gravity="center"
+                android:minWidth="36dp"
+                android:paddingStart="10dp"
                 android:paddingTop="4dp"
-                android:paddingEnd="7dp"
-                android:paddingBottom="4dp"
-                android:textColor="@color/bg"
-                android:textSize="13sp" />
-        </com.docnest.app.SquareFrameLayout>
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:background="@color/line" />
+                android:paddingEnd="10dp"
+                android:paddingBottom="5dp"
+                android:textAppearance="@style/TextAppearance.DocNest.Tab" />
+        </com.docnest.app.PageFrameLayout>
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="46dp"
-            android:orientation="horizontal">
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="2dp"
+            android:paddingEnd="2dp">
 
-            <ImageButton
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/rotBtn"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:background="?attr/selectableItemBackground"
+                style="@style/Widget.DocNest.IconButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
                 android:contentDescription="Rotate"
-                android:src="@drawable/ic_rotate" />
+                app:icon="@drawable/ic_rotate" />
 
-            <ImageButton
-                android:id="@+id/upBtn"
+            <Space
                 android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:background="?attr/selectableItemBackground"
-                android:contentDescription="Move earlier"
-                android:src="@drawable/ic_left" />
+                android:layout_height="0dp"
+                android:layout_weight="1" />
 
-            <ImageButton
-                android:id="@+id/downBtn"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:background="?attr/selectableItemBackground"
-                android:contentDescription="Move later"
-                android:src="@drawable/ic_right" />
-
-            <ImageButton
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/delBtn"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:background="?attr/selectableItemBackground"
-                android:contentDescription="Remove"
-                android:src="@drawable/ic_close"
-                app:tint="@color/accent" />
+                style="@style/Widget.DocNest.IconButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:contentDescription="Delete"
+                app:icon="@drawable/ic_trash" />
         </LinearLayout>
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>
