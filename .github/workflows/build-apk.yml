@@ -1,13 +1,14 @@
-# Builds the APK on GitHub's computers, so nothing needs installing on yours.
-# Runs on every upload, or by hand from the Actions tab ("Run workflow").
+# Builds DocNest on GitHub's computers and publishes every build from main as a GitHub Release,
+# which the app's update check reads. Also runs by hand from the Actions tab ("Run workflow").
 name: Build APK
 
 on:
   push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
-  # Lets the first build save the signing key into the repository.
+  # Lets the build save the signing key once, and publish releases.
   contents: write
 
 jobs:
@@ -21,19 +22,27 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      # Every build must be signed with the same key, or a new APK won't install over the old one.
-      # The first build makes the key and saves it in the repository; later builds reuse it.
-      - name: Create the signing key (first build only)
-        if: hashFiles('app/docnest-debug.keystore') == ''
+      # Every release must be signed with the same key, or updates won't install over each other.
+      # The first build makes the key, locked with the SIGNING_PASSWORD secret, and saves it in the
+      # repository; later builds reuse it. Without that password the saved key is useless.
+      - name: Get the signing key
+        env:
+          SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
         run: |
-          keytool -genkeypair -keystore app/docnest-debug.keystore -storetype PKCS12 \
-            -storepass android -alias androiddebugkey -keyalg RSA -keysize 2048 \
-            -validity 10000 -dname "CN=DocNest"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add app/docnest-debug.keystore
-          git commit -m "Add the fixed signing key for DocNest builds"
-          git push origin HEAD:${{ github.ref_name }}
+          if [ -z "$SIGNING_PASSWORD" ]; then
+            echo "::error::Add the SIGNING_PASSWORD secret first (see README: Releases and updates)."
+            exit 1
+          fi
+          if [ ! -f app/release.keystore ]; then
+            keytool -genkeypair -keystore app/release.keystore -storetype PKCS12 \
+              -storepass:env SIGNING_PASSWORD -alias docnest -keyalg RSA -keysize 3072 \
+              -validity 10000 -dname "CN=DocNest"
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add app/release.keystore
+            git commit -m "Add DocNest's signing key, locked with the SIGNING_PASSWORD secret"
+            git push origin HEAD:${{ github.ref_name }}
+          fi
 
       # v5, not v6: v6 moved its caching into a closed-source part with separate terms of use.
       - uses: gradle/actions/setup-gradle@v5
@@ -41,12 +50,24 @@ jobs:
           gradle-version: 8.14.3
 
       - name: Build the APK
+        env:
+          SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
         run: |
-          gradle assembleDebug
-          cp app/build/outputs/apk/debug/app-debug.apk DocNest.apk
+          gradle assembleRelease -PbuildNumber=${{ github.run_number }}
+          cp app/build/outputs/apk/release/app-release.apk DocNest-1.${{ github.run_number }}.apk
 
       # Uploaded as the .apk itself, not a zip, so a phone can install it straight after downloading.
       - uses: actions/upload-artifact@v7
         with:
-          path: DocNest.apk
+          path: DocNest-1.${{ github.run_number }}.apk
           archive: false
+
+      # Tagged v1.<build number>: the app compares that number with its own version.
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v1.${{ github.run_number }}" "DocNest-1.${{ github.run_number }}.apk" \
+            --title "DocNest 1.${{ github.run_number }}" \
+            --notes "$(git log -1 --pretty=%s ${{ github.sha }})" \
+            --target "${{ github.sha }}"

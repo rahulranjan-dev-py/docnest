@@ -5,6 +5,10 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+// GitHub passes its build number, so every release has a higher versionCode than the one before.
+// The in-app updater compares it with the number in the latest release's tag (v1.<build number>).
+val buildNumber = (findProperty("buildNumber") as String?)?.toIntOrNull() ?: 1
+
 android {
     namespace = "com.docnest.app"
     compileSdk = 35
@@ -14,28 +18,29 @@ android {
         minSdk = 26
         // 34 keeps the classic layout below the status bar on Android 15+.
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = buildNumber
+        versionName = "1.$buildNumber"
     }
 
-    // The same key for every build, so a new APK installs over the old one and keeps its photos.
-    // GitHub's first build creates the key (see .github/workflows/build-apk.yml).
+    // Releases are signed with app/release.keystore, which is locked with the SIGNING_PASSWORD secret
+    // that only GitHub's build can read. Without that password (in Android Studio, say) the debug key is used.
+    val releaseKey = file("release.keystore")
+    val signingPassword: String? = System.getenv("SIGNING_PASSWORD")
     signingConfigs {
-        getByName("debug") {
-            val key = file("docnest-debug.keystore")
-            if (key.exists()) {
-                storeFile = key
-                storeType = "pkcs12"
-                storePassword = "android"
-                keyAlias = "androiddebugkey"
-                keyPassword = "android"
-            }
+        create("release") {
+            storeFile = releaseKey
+            storeType = "pkcs12"
+            storePassword = signingPassword
+            keyAlias = "docnest"
+            keyPassword = signingPassword
         }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
+            val canSign = releaseKey.exists() && !signingPassword.isNullOrEmpty()
+            signingConfig = signingConfigs.getByName(if (canSign) "release" else "debug")
         }
     }
 

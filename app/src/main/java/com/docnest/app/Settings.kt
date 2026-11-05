@@ -35,11 +35,6 @@ class Settings(context: Context) {
         get() = PageSize.entries.firstOrNull { it.name == prefs.getString("page", null) } ?: PageSize.A4
         set(v) = prefs.edit { putString("page", v.name) }
 
-    // A custom file name is kept for the same day only, so tomorrow's PDF gets tomorrow's date.
-    var name: String
-        get() = if (prefs.getString("nameDate", null) == dateDots()) prefs.getString("name", "") ?: "" else ""
-        set(v) = prefs.edit { putString("name", v); putString("nameDate", dateDots()) }
-
     var footerOn: Boolean
         get() = prefs.getBoolean("footerOn", false)
         set(v) = prefs.edit { putBoolean("footerOn", v) }
@@ -48,13 +43,8 @@ class Settings(context: Context) {
         get() = prefs.getString("footer", "") ?: ""
         set(v) = prefs.edit { putString("footer", v) }
 
-    fun fileName(): String {
-        val n = name.ifBlank { defaultName() }
-            .replace(Regex("\\.pdf$", RegexOption.IGNORE_CASE), "")
-            .replace(Regex("[\\\\/:*?\"<>|]+"), "-")
-            .trim()
-        return n.ifEmpty { defaultName() } + ".pdf"
-    }
+    // Always Scan_<date>.pdf; a second PDF on the same day becomes "Scan_<date> (1).pdf" in Downloads.
+    fun fileName() = defaultName() + ".pdf"
 
     /** The footer line without the page number, or null when the footer is off. */
     fun footerLine(): String? {

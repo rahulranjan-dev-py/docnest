@@ -108,30 +108,11 @@
             android:id="@+id/pageHint"
             style="@style/Widget.DocNest.SettingHint" />
 
-        <TextView
-            style="@style/Widget.DocNest.SettingTitle"
-            android:text="File name" />
-
-        <com.google.android.material.textfield.TextInputLayout
-            android:id="@+id/nameBox"
-            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:suffixText=".pdf">
-
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/nameIn"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:imeOptions="actionDone"
-                android:inputType="text"
-                android:singleLine="true" />
-        </com.google.android.material.textfield.TextInputLayout>
-
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
+            android:baselineAligned="false"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
@@ -164,23 +145,64 @@
                 android:contentDescription="Page footer" />
         </LinearLayout>
 
-        <com.google.android.material.textfield.TextInputLayout
-            android:id="@+id/footBox"
-            style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+        <!-- The hint sits outside the text box so it lines up with every other hint in the sheet. -->
+        <LinearLayout
+            android:id="@+id/footGroup"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:hint="Footer text (optional)"
-            app:helperText="English letters, numbers and punctuation only.">
+            android:orientation="vertical">
 
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/footIn"
+            <com.google.android.material.textfield.TextInputLayout
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:imeOptions="actionDone"
-                android:inputType="text"
-                android:singleLine="true" />
-        </com.google.android.material.textfield.TextInputLayout>
+                android:hint="Footer text (optional)">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/footIn"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:imeOptions="actionDone"
+                    android:inputType="text"
+                    android:singleLine="true" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <TextView
+                style="@style/Widget.DocNest.SettingHint"
+                android:text="English letters, numbers and punctuation only." />
+        </LinearLayout>
+
+        <TextView
+            style="@style/Widget.DocNest.SettingTitle"
+            android:text="Updates" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:baselineAligned="false"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/versionText"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="12dp"
+                android:layout_weight="1"
+                android:textAppearance="?attr/textAppearanceBodyMedium"
+                android:textColor="?attr/colorOnSurfaceVariant" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/updateBtn"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:maxLines="1"
+                android:text="Check for updates"
+                android:textColor="?attr/colorOnSurface"
+                app:strokeColor="?attr/colorOutline" />
+        </LinearLayout>
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/doneBtn"

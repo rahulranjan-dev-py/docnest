@@ -186,9 +186,11 @@
                 android:visibility="gone"
                 app:icon="@drawable/ic_pdf" />
 
+            <!-- baselineAligned off: with large system text a label can wrap and push its button down. -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:baselineAligned="false"
                 android:orientation="horizontal">
 
                 <com.google.android.material.button.MaterialButton
@@ -197,7 +199,8 @@
                     android:layout_width="0dp"
                     android:layout_marginEnd="5dp"
                     android:layout_weight="1"
-                    android:text="Add photos"
+                    android:contentDescription="Add photos from gallery"
+                    android:text="Gallery"
                     app:icon="@drawable/ic_photos" />
 
                 <com.google.android.material.button.MaterialButton

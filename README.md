@@ -13,8 +13,10 @@ into a PDF.
   photo-size pages, file name, and an optional footer with the date and page numbers.
 - **Share anywhere.** After **Make PDF**, the file is saved in **Downloads** and the share screen
   opens, so you can send it on WhatsApp, Gmail or any other app.
-- **Private and offline.** No account, no internet, no ads. Pages stay on the phone until you tap
-  **Clear**.
+- **Updates itself.** DocNest checks GitHub for a new version twice a day and offers to install it.
+  You can also tap **Check for updates** in the settings sheet.
+- **Private.** No account, no ads, no tracking. Pages stay on the phone until you tap **Clear**. The
+  only thing DocNest does online is check GitHub for updates.
 
 For now the whole photo always goes into the PDF, uncropped. Automatic edge detection, which you will
 be able to switch on or off, is planned.
@@ -38,10 +40,22 @@ GitHub builds the APK for free on its own computers. You only need a GitHub acco
 5. Click the finished run, scroll to **Artifacts** and download **DocNest.apk**. You can do this
    straight from your phone's browser (signed in to GitHub) and then tap the file to install it.
 
-Every build is signed with the same key, so a new version installs over the old one and keeps your
-photos. GitHub's first build creates this key and saves it in the repository as
-`app/docnest-debug.keystore`. It is a testing key: before sharing DocNest widely, replace it with a
-private release key.
+## Releases and updates
+
+Every build from `main` is published as a GitHub Release named `DocNest 1.<build number>`, with the
+APK attached. The app reads the latest release to offer updates, so the repository must be public.
+
+Every release is signed with the same key, so a new version installs over the old one and keeps your
+pages. Set this up once, before the first release:
+
+1. Open the repository's **Settings → Secrets and variables → Actions** and click **New repository
+   secret**.
+2. **Name:** `SIGNING_PASSWORD`. **Secret:** a long password you make up, at least 25 letters and
+   numbers. Keep a copy in a safe place, such as a password manager. Click **Add secret**.
+
+The next build creates the signing key, locks it with that password, and saves it as
+`app/release.keystore`. Only GitHub's build can unlock it. Never delete the secret: without it, new
+versions can't be signed to install over the old ones.
 
 ## Or build the app in Android Studio (on this computer)
 
@@ -93,5 +107,8 @@ private release key.
 
 ## Updating the app later
 
-Build again and install the new APK over the old one; your photos are kept. Android Studio builds use
-the same key as GitHub's, as long as `app/docnest-debug.keystore` is in the project folder.
+DocNest offers each new release by itself: tap **Update** when it appears. The first time, Android asks
+you to allow DocNest to install apps; turn on **Allow from this source** and go back.
+
+Builds made in Android Studio are signed with your computer's debug key, not the release key, so they
+won't install over a release. Uninstall DocNest first if you want to test one.

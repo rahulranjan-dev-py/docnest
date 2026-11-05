@@ -20,12 +20,16 @@
     </style>
 
     <!-- The two big buttons at the bottom of the main screen. -->
+    <!-- One line only, so large system text shortens a label instead of wrapping it. -->
     <style name="Widget.DocNest.DockButton" parent="Widget.Material3.Button">
         <item name="android:layout_height">56dp</item>
         <item name="android:insetTop">0dp</item>
         <item name="android:insetBottom">0dp</item>
+        <item name="android:paddingStart">16dp</item>
+        <item name="android:paddingEnd">16dp</item>
         <item name="android:textSize">16sp</item>
         <item name="android:maxLines">1</item>
+        <item name="android:ellipsize">end</item>
         <item name="cornerRadius">16dp</item>
         <item name="iconGravity">textStart</item>
     </style>
@@ -34,8 +38,11 @@
         <item name="android:layout_height">56dp</item>
         <item name="android:insetTop">0dp</item>
         <item name="android:insetBottom">0dp</item>
+        <item name="android:paddingStart">16dp</item>
+        <item name="android:paddingEnd">16dp</item>
         <item name="android:textSize">16sp</item>
         <item name="android:maxLines">1</item>
+        <item name="android:ellipsize">end</item>
         <item name="cornerRadius">16dp</item>
         <item name="iconGravity">textStart</item>
     </style>

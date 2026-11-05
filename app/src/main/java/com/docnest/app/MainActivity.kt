@@ -31,7 +31,6 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.materialswitch.MaterialSwitch
 import com.google.android.material.progressindicator.LinearProgressIndicator
 import com.google.android.material.snackbar.Snackbar
-import com.google.android.material.textfield.TextInputLayout
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -80,6 +79,14 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
         refresh()
         val added = r.data?.getIntExtra(CameraActivity.EXTRA_ADDED, 0) ?: 0
         if (added > 0) note("${pages(added)} added")
+    }
+
+    // An update waiting for the "install unknown apps" permission.
+    private var pendingInstall: File? = null
+
+    private val askInstallPermission = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        val apk = pendingInstall
+        if (apk != null && Updater.canInstall(this)) install(apk)
     }
 
     // Hold a page to pick it up, drag it to its new place, let go.
@@ -144,6 +151,10 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
         makeBtn.setOnClickListener { onMake() }
 
         refresh()
+        val updates = getSharedPreferences("updates", MODE_PRIVATE)
+        if (savedInstanceState == null && System.currentTimeMillis() - updates.getLong("lastCheck", 0) > 12 * 3_600_000L) {
+            checkForUpdate(manual = false)
+        }
     }
 
     override fun onResume() {
@@ -355,10 +366,8 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
         val quality = v.findViewById<MaterialButtonToggleGroup>(R.id.qualityGroup)
         val colour = v.findViewById<MaterialButtonToggleGroup>(R.id.colorGroup)
         val page = v.findViewById<MaterialButtonToggleGroup>(R.id.pageGroup)
-        val nameBox = v.findViewById<TextInputLayout>(R.id.nameBox)
-        val nameIn = v.findViewById<EditText>(R.id.nameIn)
         val footOn = v.findViewById<MaterialSwitch>(R.id.footOn)
-        val footBox = v.findViewById<View>(R.id.footBox)
+        val footGroup = v.findViewById<View>(R.id.footGroup)
         val footIn = v.findViewById<EditText>(R.id.footIn)
 
         // One line under each choice says what the selected option does.
@@ -395,12 +404,15 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
                 R.id.pPhoto to "Each page is the size of its photo, with no white border.",
             )
         )
-        nameIn.setText(settings.name)
-        nameBox.helperText = "Leave empty to use ${defaultName()}"
         footOn.isChecked = settings.footerOn
-        footBox.isVisible = settings.footerOn
-        footOn.setOnCheckedChangeListener { _, on -> footBox.isVisible = on }
+        footGroup.isVisible = settings.footerOn
+        footOn.setOnCheckedChangeListener { _, on -> footGroup.isVisible = on }
         footIn.setText(settings.footer)
+        v.findViewById<TextView>(R.id.versionText).text = "Version ${Updater.versionName(this)}"
+        v.findViewById<View>(R.id.updateBtn).setOnClickListener {
+            sheet.dismiss()
+            checkForUpdate(manual = true)
+        }
         v.findViewById<View>(R.id.doneBtn).setOnClickListener { sheet.dismiss() }
 
         sheet.setOnDismissListener {
@@ -411,7 +423,6 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
             }
             settings.grey = colour.checkedButtonId == R.id.cGrey
             settings.page = if (page.checkedButtonId == R.id.pPhoto) PageSize.PHOTO else PageSize.A4
-            settings.name = nameIn.text.toString().trim()
             settings.footerOn = footOn.isChecked
             settings.footer = footIn.text.toString()
             refresh()
@@ -433,6 +444,68 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
             }
             .setNegativeButton("Cancel", null)
             .show()
+    }
+
+    // ---------- updates ----------
+
+    private fun checkForUpdate(manual: Boolean) {
+        lifecycleScope.launch {
+            val r = withContext(Dispatchers.IO) { runCatching { Updater.latest() } }
+            if (r.isSuccess) {
+                getSharedPreferences("updates", MODE_PRIVATE).edit()
+                    .putLong("lastCheck", System.currentTimeMillis()).apply()
+            }
+            val release = r.getOrNull()
+            when {
+                release != null && release.version > Updater.installedVersion(this@MainActivity) -> offerUpdate(release)
+                !manual -> Unit
+                r.isFailure -> note("Couldn't check for updates. Check your internet connection and try again.", long = true)
+                else -> note("DocNest is up to date")
+            }
+        }
+    }
+
+    private fun offerUpdate(r: Updater.Release) {
+        Snackbar.make(root, "${r.name} is available", Snackbar.LENGTH_INDEFINITE)
+            .setAnchorView(dock)
+            .setAction("Update") { downloadUpdate(r) }
+            .show()
+    }
+
+    private fun downloadUpdate(r: Updater.Release) {
+        if (busy) return
+        setBusy(true)
+        setProgress("Downloading update…", 0f)
+        lifecycleScope.launch {
+            try {
+                val apk = withContext(Dispatchers.IO) {
+                    Updater.download(this@MainActivity, r) { f ->
+                        runOnUiThread { setProgress("Downloading update… ${(f * 100).toInt()}%", f) }
+                    }
+                }
+                setBusy(false)
+                install(apk)
+            } catch (e: Throwable) {
+                if (e is CancellationException) throw e
+                setBusy(false)
+                note("Couldn't download the update. Check your internet connection and try again.", long = true)
+            }
+        }
+    }
+
+    private fun install(apk: File) {
+        if (!Updater.canInstall(this)) {
+            pendingInstall = apk
+            MaterialAlertDialogBuilder(this)
+                .setTitle("Allow Updates")
+                .setMessage("To install updates, turn on “Allow from this source” for DocNest, then come back.")
+                .setPositiveButton("Open settings") { _, _ -> askInstallPermission.launch(Updater.permissionIntent(this)) }
+                .setNegativeButton("Cancel", null)
+                .show()
+            return
+        }
+        pendingInstall = null
+        startActivity(Updater.installIntent(this, apk))
     }
 
     // ---------- making and sending the PDF ----------
