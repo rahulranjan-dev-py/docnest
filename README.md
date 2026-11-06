@@ -4,34 +4,41 @@ A free, ad-free document scanner for Android. Photograph your pages and DocNest 
 into a PDF.
 
 - **Fast camera.** Tap **Scan**, then the shutter (or a volume button) again and again: there is no
-  ✓ / ✗ screen between shots. Tap **Done** when finished.
+  ✓ / ✗ screen between shots. Tap **Done** when finished. A photo that looks out of focus is marked
+  **Blurry?**, so you can retake it before it reaches a PDF.
+- **Crop to page edges** (a switch in settings, off by default). When on, **Scan** opens Google's
+  page scanner instead: it finds each page, crops and straightens it, and lets you drag the corners.
+  Off keeps the whole photo, which suits several articles in one shot.
 - **Add photos** from your gallery. They are sorted by the time they were taken, with a note if any
   were taken before today.
 - **Check before you make the PDF.** Hold a page and drag it to reorder. Rotate or delete it (with
   Undo). Tap a page to see it large.
 - **PDF settings** (the sliders button at the top). Quality, A4 or photo-size pages, an optional
   footer with the date and page numbers, and how pages look:
-  - **Colour:** the photo as taken.
+  - **Original:** the photo as taken.
   - **Document:** like a scanner. Lighting is evened out, shadows and yellowed paper turn white,
     and text is sharpened.
+  - **Vivid:** Document with stronger colour and darker text.
   - **B&W:** pure black text on white, judged spot by spot so faint print and shaded areas stay
-    readable. Pages are stored at 1 bit per pixel, so the PDF is much smaller. Best for pages of
-    text; photos in the article turn into rough black-and-white patterns.
+    readable, with stray specks cleaned up. Pages are stored at 1 bit per pixel, so the PDF is much
+    smaller. Best for pages of text; photos in the article turn into rough black-and-white patterns.
+- **Searchable text** (a switch in settings, off by default). DocNest reads the English text on
+  each page and hides it behind the picture, so you can search and copy words in the PDF. Making
+  the PDF takes longer. The text reader comes from Google Play services and downloads itself the
+  first time.
 - **File names** are always `Scan_<date>.pdf`; a second PDF on the same day gets "(1)" added.
 - **Share anywhere.** After **Make PDF**, the file is saved in **Downloads** and the share screen
   opens, so you can send it on WhatsApp, Gmail or any other app.
 - **My documents** (the folder button at the top). Every PDF DocNest has made, newest first, with a
   preview of page 1. Tap one to open it, tap the star to keep it under **Favourites**, or use **⋮**
-  to share, rename or delete it. Deleting has an Undo. These are the same files as in Downloads, so a
-  rename or delete here changes the file there too.
+  to share, rename or delete it. Deleting has an Undo. **Search** finds documents by name, and by the
+  words inside searchable PDFs. These are the same files as in Downloads, so a rename or delete here
+  changes the file there too.
 - **Updates itself.** When a new version is out, a card appears at the top: **What's new**, **Later**,
   **Update**, or ✕ to skip that version. Every download is checked against the release's SHA-256
   checksum before it can be installed. You can also tap **Check for updates** in the settings sheet.
 - **Private.** No account, no ads, no tracking. Pages stay on the phone until you tap **Clear**. The
   only thing DocNest does online is check GitHub for updates.
-
-For now the whole photo always goes into the PDF, uncropped. Automatic edge detection, which you will
-be able to switch on or off, is planned.
 
 ---
 

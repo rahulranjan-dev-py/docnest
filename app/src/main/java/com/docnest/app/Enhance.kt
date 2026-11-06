@@ -10,10 +10,13 @@ import kotlin.math.min
 /** How a photo looks in the PDF. */
 enum class ColourMode(val label: String) {
     /** The photo as taken. */
-    COLOUR("Colour"),
+    COLOUR("Original"),
 
     /** Even lighting, white paper and crisper text, like a flatbed scanner. */
     DOCUMENT("Document"),
+
+    /** Document, plus stronger colour and contrast so ink and pictures stand out. */
+    VIVID("Vivid"),
 
     /** Pure black text on pure white paper, stored at 1 bit per pixel. */
     BW("B&W"),
@@ -41,8 +44,9 @@ object Enhance {
      * 2. Divides each colour by it, so the paper becomes white everywhere: shadows and
      *    yellowing disappear, and text keeps its contrast.
      * 3. Sets black and white points, then sharpens text edges a little.
+     * [vivid] also raises colour saturation and darkens mid-tones, for a punchier page.
      */
-    fun document(bmp: Bitmap) {
+    fun document(bmp: Bitmap, vivid: Boolean = false) {
         val w = bmp.width
         val h = bmp.height
         val px = IntArray(w * h)
@@ -70,6 +74,7 @@ object Enhance {
         }
 
         val range = (WHITE_POINT - BLACK_POINT).toFloat()
+        val rgb = FloatArray(3)
         // Per pixel: the paper colour interpolated between cell centres, then gain and levels.
         for (y in 0 until h) {
             val fy = ((y + 0.5f) / CELL - 0.5f).coerceIn(0f, (gh - 1).toFloat())
@@ -83,24 +88,39 @@ object Enhance {
                 val x1 = min(x0 + 1, gw - 1)
                 val tx = fx - x0
                 val c = px[row + x]
-                var out = c and 0xFF000000.toInt()
                 for (ch in 0..2) {
                     val g = paper[ch]
                     val top = g[y0 * gw + x0] + (g[y0 * gw + x1] - g[y0 * gw + x0]) * tx
                     val bottom = g[y1 * gw + x0] + (g[y1 * gw + x1] - g[y1 * gw + x0]) * tx
                     val bg = max(top + (bottom - top) * ty, 1f)
                     val gain = min(255f / bg, MAX_GAIN)
-                    val shift = 16 - 8 * ch
-                    val v = ((c shr shift) and 255) * gain
-                    val leveled = ((v - BLACK_POINT) * 255f / range).toInt().coerceIn(0, 255)
-                    out = out or (leveled shl shift)
+                    val v = ((c shr (16 - 8 * ch)) and 255) * gain
+                    rgb[ch] = (v - BLACK_POINT) * 255f / range
                 }
-                px[row + x] = out
+                if (vivid) boost(rgb)
+                px[row + x] = (c and 0xFF000000.toInt()) or
+                    (rgb[0].toInt().coerceIn(0, 255) shl 16) or
+                    (rgb[1].toInt().coerceIn(0, 255) shl 8) or
+                    rgb[2].toInt().coerceIn(0, 255)
             }
         }
 
         sharpen(px, w, h)
         bmp.setPixels(px, 0, w, 0, 0, w, h)
+    }
+
+    private const val VIVID_SATURATION = 1.45f
+
+    // Gamma 1.25 as a lookup table: darkens mid-tones, while paper (255) stays white.
+    private val vividCurve = FloatArray(256) { 255f * Math.pow(it / 255.0, 1.25).toFloat() }
+
+    /** Pushes colours away from grey and darkens mid-tones; [rgb] is 0–255 per channel. */
+    private fun boost(rgb: FloatArray) {
+        val grey = 0.299f * rgb[0] + 0.587f * rgb[1] + 0.114f * rgb[2]
+        for (ch in 0..2) {
+            val saturated = (grey + (rgb[ch] - grey) * VIVID_SATURATION).coerceIn(0f, 255f)
+            rgb[ch] = vividCurve[saturated.toInt()]
+        }
     }
 
     /** Each cell takes the brightest of itself and its 8 neighbours. */
@@ -196,8 +216,7 @@ object Enhance {
         }
 
         val half = max(8, w / 24)
-        val rowBytes = (w + 7) / 8
-        val bits = ByteArray(rowBytes * h) // 0 = black until a pixel is found to be white
+        val black = BooleanArray(w * h)
         for (y in 0 until h) {
             val ya = max(0, y - half)
             val yb = min(h - 1, y + half)
@@ -208,8 +227,27 @@ object Enhance {
                 val sum = (sums[(yb + 1) * stride + xb + 1] - sums[ya * stride + xb + 1] -
                     sums[(yb + 1) * stride + xa] + sums[ya * stride + xa]).toLong()
                 val l = lum[y * w + x]
-                val black = l < ALWAYS_BLACK || l * count * 100 <= sum * (100 - THRESHOLD)
-                if (!black) {
+                black[y * w + x] = l < ALWAYS_BLACK || l * count * 100 <= sum * (100 - THRESHOLD)
+            }
+        }
+
+        // Specks: a black pixel with at most one black neighbour is paper grain, not print.
+        // Even a full stop is several pixels across at this size, so real marks are kept.
+        val rowBytes = (w + 7) / 8
+        val bits = ByteArray(rowBytes * h) // 0 = black until a pixel is found to be white
+        for (y in 0 until h) {
+            for (x in 0 until w) {
+                var ink = black[y * w + x]
+                if (ink) {
+                    var neighbours = 0
+                    for (dy in -1..1) for (dx in -1..1) {
+                        val yy = y + dy
+                        val xx = x + dx
+                        if ((dx != 0 || dy != 0) && yy in 0 until h && xx in 0 until w && black[yy * w + xx]) neighbours++
+                    }
+                    ink = neighbours > 1
+                }
+                if (!ink) {
                     val i = y * rowBytes + (x shr 3)
                     bits[i] = (bits[i].toInt() or (0x80 ushr (x and 7))).toByte()
                 }

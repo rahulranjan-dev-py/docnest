@@ -69,6 +69,12 @@ dependencies {
     implementation("com.google.android.material:material:1.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 
+    // Google ML Kit through Play services: the models come with Play services, not inside the APK.
+    // Document scanner: finds, crops and straightens pages when "Crop to page edges" is on.
+    implementation("com.google.android.gms:play-services-mlkit-document-scanner:16.0.0")
+    // Text recognition, for searchable PDFs.
+    implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.2")
+
     val camerax = "1.4.1"
     implementation("androidx.camera:camera-core:$camerax")
     implementation("androidx.camera:camera-camera2:$camerax")

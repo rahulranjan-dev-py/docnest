@@ -44,6 +44,8 @@ class DocumentsActivity : AppCompatActivity(), DocumentAdapter.Listener {
     private lateinit var adapter: DocumentAdapter
 
     private var all: List<Doc> = emptyList()
+    private var texts: Map<String, String> = emptyMap() // key → recognised text, lower case
+    private var query = ""
     private var loaded = false
     private var loadFailed = false
     private var onlyFavourites = false
@@ -63,6 +65,10 @@ class DocumentsActivity : AppCompatActivity(), DocumentAdapter.Listener {
         chipFavourites = findViewById(R.id.chipFavourites)
 
         findViewById<View>(R.id.backBtn).setOnClickListener { finish() }
+        findViewById<EditText>(R.id.searchIn).doAfterTextChanged {
+            query = it?.toString()?.trim()?.lowercase().orEmpty()
+            render()
+        }
         findViewById<ChipGroup>(R.id.filter).setOnCheckedStateChangeListener { _, ids ->
             onlyFavourites = R.id.chipFavourites in ids
             render()
@@ -90,11 +96,18 @@ class DocumentsActivity : AppCompatActivity(), DocumentAdapter.Listener {
     private fun load() {
         if (!loaded) loading.isVisible = true
         lifecycleScope.launch {
-            val result = withContext(Dispatchers.IO) { runCatching { Library.list(this@DocumentsActivity) } }
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    val docs = Library.list(this@DocumentsActivity)
+                    val found = docs.mapNotNull { d -> Library.text(this@DocumentsActivity, d.key)?.let { d.key to it.lowercase() } }
+                    docs to found.toMap()
+                }
+            }
             loaded = true
             loading.isVisible = false
             loadFailed = result.isFailure
-            all = result.getOrElse { emptyList() }
+            all = result.getOrNull()?.first.orEmpty()
+            texts = result.getOrNull()?.second.orEmpty()
             render()
         }
     }
@@ -105,11 +118,20 @@ class DocumentsActivity : AppCompatActivity(), DocumentAdapter.Listener {
         val starred = present.filter { it.key in favs }
         chipAll.text = "All (${present.size})"
         chipFavourites.text = "Favourites (${starred.size})"
-        val shown = if (onlyFavourites) starred else present
+        val filtered = if (onlyFavourites) starred else present
+        // Search looks at names, and inside PDFs that were made searchable.
+        val shown = if (query.isEmpty()) filtered else filtered.filter { d ->
+            d.name.lowercase().contains(query) || texts[d.key]?.contains(query) == true
+        }
         adapter.submit(shown, favs)
 
         empty.isVisible = loaded && shown.isEmpty()
         when {
+            query.isNotEmpty() && filtered.isNotEmpty() -> showEmpty(
+                "No matches for “$query”",
+                "Search looks in document names, and in the text of searchable PDFs.",
+                "Clear search",
+            ) { findViewById<EditText>(R.id.searchIn).setText("") }
             loadFailed -> showEmpty(
                 "Couldn't load your documents",
                 "Check that your phone has some free space, then try again.",

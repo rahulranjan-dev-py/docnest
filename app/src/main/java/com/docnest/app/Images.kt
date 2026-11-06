@@ -73,30 +73,69 @@ object Images {
         return bytes.toByteArray()
     }
 
+    /** A photo just saved into the batch: its thumbnail, and whether it looks out of focus. */
+    class Stored(val thumb: Bitmap, val blurry: Boolean)
+
     /**
      * Saves a new photo into the batch: upright, at most [STORE_EDGE] px, plus a small thumbnail.
-     * Returns the thumbnail, or null when the image can't be opened.
+     * Returns null when the image can't be opened.
      */
-    fun store(open: () -> InputStream, degrees: Int, photo: File, thumb: File): Bitmap? {
+    fun store(open: () -> InputStream, degrees: Int, photo: File, thumb: File): Stored? {
         val src = decodeSampled(open, STORE_EDGE) ?: return null
         val upright = render(src, STORE_EDGE, degrees)
         src.recycle()
         photo.outputStream().use { upright.compress(Bitmap.CompressFormat.JPEG, STORE_QUALITY, it) }
+        val blurry = looksBlurry(upright)
         val small = render(upright, THUMB_EDGE, 0)
         upright.recycle()
         thumb.outputStream().use { small.compress(Bitmap.CompressFormat.JPEG, 72, it) }
-        return small
+        return Stored(small, blurry)
+    }
+
+    // Below this, a page photo is probably out of focus or shaken; crisp print scores far higher.
+    // Kept low on purpose: a false "Blurry?" is more annoying than a missed one.
+    private const val BLUR_LIMIT = 60.0
+
+    /** Variance of the Laplacian on a 640 px greyscale copy: few sharp edges means a low score. */
+    private fun looksBlurry(src: Bitmap): Boolean {
+        val small = render(src, 640, 0)
+        val w = small.width
+        val h = small.height
+        val px = IntArray(w * h)
+        small.getPixels(px, 0, w, 0, 0, w, h)
+        small.recycle()
+        val grey = IntArray(w * h) { i ->
+            val c = px[i]
+            (((c shr 16) and 255) * 77 + ((c shr 8) and 255) * 150 + (c and 255) * 29) shr 8
+        }
+        var sum = 0.0
+        var sumSq = 0.0
+        var n = 0
+        for (y in 1 until h - 1) {
+            for (x in 1 until w - 1) {
+                val i = y * w + x
+                val lap = (4 * grey[i] - grey[i - 1] - grey[i + 1] - grey[i - w] - grey[i + w]).toDouble()
+                sum += lap
+                sumSq += lap * lap
+                n++
+            }
+        }
+        if (n == 0) return false
+        val mean = sum / n
+        return sumSq / n - mean * mean < BLUR_LIMIT
     }
 
     /**
-     * A stored photo, ready for a PDF page or the viewer. [ColourMode.DOCUMENT] cleans it up here;
+     * A stored photo, ready for a PDF page or the viewer. Document and Vivid clean it up here;
      * [ColourMode.BW] is turned into 1-bit pixels later, by [Enhance.bitonal].
      */
     fun load(photo: File, edge: Int, degrees: Int, colour: ColourMode = ColourMode.COLOUR): Bitmap? {
         val src = decodeSampled({ photo.inputStream() }, edge) ?: return null
         val out = render(src, edge, degrees)
         src.recycle()
-        if (colour == ColourMode.DOCUMENT) Enhance.document(out)
+        if (colour == ColourMode.DOCUMENT || colour == ColourMode.VIVID) {
+            Enhance.document(out, vivid = colour == ColourMode.VIVID)
+        }
         return out
     }
 }

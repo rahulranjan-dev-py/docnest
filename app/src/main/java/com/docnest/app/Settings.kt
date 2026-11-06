@@ -42,6 +42,16 @@ class Settings(context: Context) {
         get() = PageSize.entries.firstOrNull { it.name == prefs.getString("page", null) } ?: PageSize.A4
         set(v) = prefs.edit { putString("page", v.name) }
 
+    /** Scan finds, crops and straightens each page. Off by default: the whole photo is kept. */
+    var cropToPage: Boolean
+        get() = prefs.getBoolean("cropToPage", false)
+        set(v) = prefs.edit { putBoolean("cropToPage", v) }
+
+    /** PDFs get an invisible layer of the recognised English text, so it can be searched and copied. */
+    var searchable: Boolean
+        get() = prefs.getBoolean("searchable", false)
+        set(v) = prefs.edit { putBoolean("searchable", v) }
+
     var footerOn: Boolean
         get() = prefs.getBoolean("footerOn", false)
         set(v) = prefs.edit { putBoolean("footerOn", v) }
@@ -62,5 +72,6 @@ class Settings(context: Context) {
 
     fun summary(): String =
         quality.label + " · " + colour.label + " · " +
-            (if (page == PageSize.A4) "A4" else "Photo size") + (if (footerOn) " · Footer" else "")
+            (if (page == PageSize.A4) "A4" else "Photo size") + (if (footerOn) " · Footer" else "") +
+            (if (searchable) " · Searchable" else "")
 }

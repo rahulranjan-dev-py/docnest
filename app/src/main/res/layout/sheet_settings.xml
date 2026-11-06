@@ -58,31 +58,45 @@
 
         <TextView
             style="@style/Widget.DocNest.SettingTitle"
-            android:text="Colour" />
+            android:text="Page look" />
 
-        <com.google.android.material.button.MaterialButtonToggleGroup
+        <!-- Chips, not segments: four choices wrap onto a second line instead of being cut off. -->
+        <com.google.android.material.chip.ChipGroup
             android:id="@+id/colorGroup"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             app:selectionRequired="true"
             app:singleSelection="true">
 
-            <com.google.android.material.button.MaterialButton
+            <com.google.android.material.chip.Chip
                 android:id="@+id/cColour"
-                style="@style/Widget.DocNest.Segment"
-                android:text="Colour" />
+                style="@style/Widget.Material3.Chip.Filter"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Original" />
 
-            <com.google.android.material.button.MaterialButton
+            <com.google.android.material.chip.Chip
                 android:id="@+id/cDocument"
-                style="@style/Widget.DocNest.Segment"
+                style="@style/Widget.Material3.Chip.Filter"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
                 android:text="Document" />
 
-            <com.google.android.material.button.MaterialButton
+            <com.google.android.material.chip.Chip
+                android:id="@+id/cVivid"
+                style="@style/Widget.Material3.Chip.Filter"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Vivid" />
+
+            <com.google.android.material.chip.Chip
                 android:id="@+id/cBw"
-                style="@style/Widget.DocNest.Segment"
+                style="@style/Widget.Material3.Chip.Filter"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
                 android:contentDescription="Black and white"
                 android:text="B&amp;W" />
-        </com.google.android.material.button.MaterialButtonToggleGroup>
+        </com.google.android.material.chip.ChipGroup>
 
         <TextView
             android:id="@+id/colourHint"
@@ -113,6 +127,80 @@
         <TextView
             android:id="@+id/pageHint"
             style="@style/Widget.DocNest.SettingHint" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:baselineAligned="false"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="16dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Crop to page edges"
+                    android:textAppearance="?attr/textAppearanceTitleSmall"
+                    android:textColor="?attr/colorOnSurface" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Scan finds each page, straightens it and lets you adjust the corners. Off keeps the whole photo, for several articles in one shot."
+                    android:textAppearance="?attr/textAppearanceBodySmall"
+                    android:textColor="?attr/colorOnSurfaceVariant" />
+            </LinearLayout>
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/cropOn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:contentDescription="Crop to page edges" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:baselineAligned="false"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="16dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Searchable text"
+                    android:textAppearance="?attr/textAppearanceTitleSmall"
+                    android:textColor="?attr/colorOnSurface" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Reads the English text on each page, so you can search and copy it in the PDF and in My documents. Making the PDF takes longer."
+                    android:textAppearance="?attr/textAppearanceBodySmall"
+                    android:textColor="?attr/colorOnSurfaceVariant" />
+            </LinearLayout>
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/searchOn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:contentDescription="Searchable text" />
+        </LinearLayout>
 
         <LinearLayout
             android:layout_width="match_parent"

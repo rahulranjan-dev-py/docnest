@@ -13,6 +13,7 @@ import android.view.View
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
@@ -26,11 +27,15 @@ import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.button.MaterialButtonToggleGroup
+import com.google.android.material.chip.ChipGroup
 import com.google.android.material.color.MaterialColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.materialswitch.MaterialSwitch
 import com.google.android.material.progressindicator.LinearProgressIndicator
 import com.google.android.material.snackbar.Snackbar
+import com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions
+import com.google.mlkit.vision.documentscanner.GmsDocumentScanning
+import com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -74,6 +79,14 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
 
     private val pickPhotos = registerForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
         if (uris.isNotEmpty()) addFromGallery(uris)
+    }
+
+    // "Crop to page edges": Google's scanner finds, crops and straightens each page, and lets the
+    // user drag the corners. Its pages then join the batch like photos, in the order scanned.
+    private val pageScanner = registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { r ->
+        if (r.resultCode != RESULT_OK) return@registerForActivityResult
+        val uris = GmsDocumentScanningResult.fromActivityResultIntent(r.data)?.pages?.map { it.imageUri }.orEmpty()
+        if (uris.isNotEmpty()) addFromGallery(uris, scanned = true)
     }
 
     private val openCamera = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
@@ -145,7 +158,7 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
         grid.adapter = adapter
         dragger.attachToRecyclerView(grid)
 
-        cameraBtn.setOnClickListener { openCamera.launch(Intent(this, CameraActivity::class.java)) }
+        cameraBtn.setOnClickListener { if (settings.cropToPage) scanPages() else openOwnCamera() }
         galleryBtn.setOnClickListener { pickPhotos.launch("image/*") }
         settingsBtn.setOnClickListener { showSettings() }
         findViewById<View>(R.id.documentsBtn).setOnClickListener { openDocuments() }
@@ -312,7 +325,27 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
 
     // ---------- adding from the gallery ----------
 
-    private fun addFromGallery(uris: List<Uri>) {
+    private fun openOwnCamera() {
+        openCamera.launch(Intent(this, CameraActivity::class.java))
+    }
+
+    /** Google's page scanner (basic mode: crop, rotate, reorder; DocNest applies its own looks). */
+    private fun scanPages() {
+        val options = GmsDocumentScannerOptions.Builder()
+            .setScannerMode(GmsDocumentScannerOptions.SCANNER_MODE_BASE)
+            .setGalleryImportAllowed(true)
+            .setResultFormats(GmsDocumentScannerOptions.RESULT_FORMAT_JPEG)
+            .build()
+        GmsDocumentScanning.getClient(options).getStartScanIntent(this)
+            .addOnSuccessListener { sender -> pageScanner.launch(IntentSenderRequest.Builder(sender).build()) }
+            .addOnFailureListener {
+                note("Page cropping isn't available on this phone, so the regular camera opened.", long = true)
+                openOwnCamera()
+            }
+    }
+
+    /** Adds photos to the batch. Gallery picks go in the order they were taken; [scanned] pages keep their order. */
+    private fun addFromGallery(uris: List<Uri>, scanned: Boolean = false) {
         setBusy(true)
         lifecycleScope.launch {
             setProgress("Reading ${photos(uris.size)}…", 0f)
@@ -323,16 +356,16 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
                 }
             }
             // In the order the photos were taken; photos without a date keep their picked order, at the end.
-            val order = uris.indices.sortedWith(
+            val order = if (scanned) uris.indices.toList() else uris.indices.sortedWith(
                 compareBy<Int>({ exifs[it].taken.takeIf { t -> t > 0 } ?: Long.MAX_VALUE }, { it })
             )
             val today = startOfToday()
-            val older = exifs.count { it.taken in 1 until today }
+            val older = if (scanned) 0 else exifs.count { it.taken in 1 until today }
             var failed = 0
             order.forEachIndexed { k, i ->
                 setProgress("Adding photo ${k + 1} of ${order.size}…", k.toFloat() / order.size)
                 val p = batch.newPhoto()
-                val thumb = withContext(Dispatchers.IO) {
+                val stored = withContext(Dispatchers.IO) {
                     runCatching {
                         Images.store(
                             { contentResolver.openInputStream(uris[i])!! },
@@ -340,11 +373,12 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
                         )
                     }.getOrNull()
                 }
-                if (thumb == null) {
+                if (stored == null) {
                     failed++
                     batch.deleteFiles(p)
                 } else {
-                    adapter.putThumb(p, thumb)
+                    p.blurry = stored.blurry
+                    adapter.putThumb(p, stored.thumb)
                     batch.items.add(p)
                     batch.save()
                     refresh()
@@ -369,8 +403,10 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
         sheet.setContentView(v)
 
         val quality = v.findViewById<MaterialButtonToggleGroup>(R.id.qualityGroup)
-        val colour = v.findViewById<MaterialButtonToggleGroup>(R.id.colorGroup)
+        val colour = v.findViewById<ChipGroup>(R.id.colorGroup)
         val page = v.findViewById<MaterialButtonToggleGroup>(R.id.pageGroup)
+        val cropOn = v.findViewById<MaterialSwitch>(R.id.cropOn)
+        val searchOn = v.findViewById<MaterialSwitch>(R.id.searchOn)
         val footOn = v.findViewById<MaterialSwitch>(R.id.footOn)
         val footGroup = v.findViewById<View>(R.id.footGroup)
         val footIn = v.findViewById<EditText>(R.id.footIn)
@@ -392,6 +428,7 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
             when (settings.colour) {
                 ColourMode.COLOUR -> R.id.cColour
                 ColourMode.DOCUMENT -> R.id.cDocument
+                ColourMode.VIVID -> R.id.cVivid
                 ColourMode.BW -> R.id.cBw
             }
         )
@@ -403,13 +440,17 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
                 R.id.qHigh to "Sharpest text, largest file.",
             )
         )
-        explain(
-            colour, v.findViewById(R.id.colourHint), mapOf(
-                R.id.cColour to "Keeps the photos exactly as taken.",
-                R.id.cDocument to "Even lighting, white paper and crisper text, like a scanner.",
-                R.id.cBw to "Sharp black text on white, and the smallest files. Best for text without photos.",
-            )
+        val lookHints = mapOf(
+            R.id.cColour to "Keeps the photos exactly as taken.",
+            R.id.cDocument to "Even lighting, white paper and crisper text, like a scanner.",
+            R.id.cVivid to "Like Document, with stronger colour and darker text.",
+            R.id.cBw to "Sharp black text on white, and the smallest files. Best for text without photos.",
         )
+        val lookHint = v.findViewById<TextView>(R.id.colourHint)
+        lookHint.text = lookHints[colour.checkedChipId]
+        colour.setOnCheckedStateChangeListener { _, ids -> ids.firstOrNull()?.let { lookHint.text = lookHints[it] } }
+        cropOn.isChecked = settings.cropToPage
+        searchOn.isChecked = settings.searchable
         explain(
             page, v.findViewById(R.id.pageHint), mapOf(
                 R.id.pA4 to "Each photo is fitted onto an A4 page, ready to print.",
@@ -433,12 +474,15 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
                 R.id.qHigh -> Quality.HIGH
                 else -> Quality.STANDARD
             }
-            settings.colour = when (colour.checkedButtonId) {
+            settings.colour = when (colour.checkedChipId) {
                 R.id.cDocument -> ColourMode.DOCUMENT
+                R.id.cVivid -> ColourMode.VIVID
                 R.id.cBw -> ColourMode.BW
                 else -> ColourMode.COLOUR
             }
             settings.page = if (page.checkedButtonId == R.id.pPhoto) PageSize.PHOTO else PageSize.A4
+            settings.cropToPage = cropOn.isChecked
+            settings.searchable = searchOn.isChecked
             settings.footerOn = footOn.isChecked
             settings.footer = footIn.text.toString()
             refresh()
@@ -501,9 +545,13 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
         val page = settings.page
         val footer = settings.footerLine()
         val name = settings.fileName()
+        val searchable = settings.searchable
         val key = stateKey()
         setBusy(true)
         lifecycleScope.launch {
+            val recognizer = if (searchable) Ocr.client() else null
+            val allText = StringBuilder()
+            var unread = 0 // pages where text recognition itself failed
             try {
                 val file = withContext(Dispatchers.IO) {
                     val dir = File(cacheDir, "pdf")
@@ -513,13 +561,17 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
                     BufferedOutputStream(FileOutputStream(f), 1 shl 16).use { out ->
                         val pdf = PdfWriter(out, n, page, footer)
                         list.forEachIndexed { i, p ->
-                            withContext(Dispatchers.Main) { setProgress("Preparing page ${i + 1} of $n…", i.toFloat() / n) }
+                            val step = if (searchable) "Reading page" else "Preparing page"
+                            withContext(Dispatchers.Main) { setProgress("$step ${i + 1} of $n…", i.toFloat() / n) }
                             val bmp = Images.load(batch.photoFile(p), edge, p.rot, colour)
                                 ?: error("Page ${i + 1} could not be opened")
+                            val lines = recognizer?.let { Ocr.lines(it, bmp) }
+                            if (recognizer != null && lines == null) unread++
+                            lines?.forEach { allText.append(it.text).append('\n') }
                             if (colour == ColourMode.BW) {
-                                pdf.addBitonalPage(Enhance.bitonal(bmp))
+                                pdf.addBitonalPage(Enhance.bitonal(bmp), lines.orEmpty())
                             } else {
-                                pdf.addPage(Images.jpeg(bmp, quality.jpegQuality), bmp.width, bmp.height)
+                                pdf.addPage(Images.jpeg(bmp, quality.jpegQuality), bmp.width, bmp.height, lines.orEmpty())
                             }
                             bmp.recycle()
                         }
@@ -528,15 +580,21 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
                     f
                 }
                 setProgress("Saving to My documents…", 1f)
-                val saved = withContext(Dispatchers.IO) { runCatching { Library.save(this@MainActivity, file) }.getOrNull() }
+                val saved = withContext(Dispatchers.IO) {
+                    runCatching { Library.save(this@MainActivity, file) }.getOrNull()
+                        ?.also { if (allText.isNotBlank()) Library.saveText(this@MainActivity, it.key, allText.toString()) }
+                }
                 built = Built(file, key)
                 setBusy(false)
                 refresh()
                 val size = fmtBytes(file.length())
-                if (saved != null) {
-                    note("Saved ${saved.name} ($size)", long = true, action = "View" to ::openDocuments)
-                } else {
-                    note("PDF ready ($size), but it couldn't be saved. Tap Share PDF to send it.", long = true)
+                when {
+                    saved == null -> note("PDF ready ($size), but it couldn't be saved. Tap Share PDF to send it.", long = true)
+                    searchable && unread == n -> note(
+                        "Saved ${saved.name}, but without searchable text: the text reader is still downloading. Try again in a few minutes.",
+                        long = true, action = "View" to ::openDocuments,
+                    )
+                    else -> note("Saved ${saved.name} ($size)", long = true, action = "View" to ::openDocuments)
                 }
                 share(file)
             } catch (e: Throwable) {
@@ -544,6 +602,8 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
                 setBusy(false)
                 refresh()
                 note("Couldn't make the PDF. Try Small quality, or make it from fewer pages.", long = true)
+            } finally {
+                recognizer?.close()
             }
         }
     }

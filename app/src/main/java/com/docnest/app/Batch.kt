@@ -5,7 +5,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 
-class Photo(val id: String, var rot: Int = 0)
+/** One page of the batch. [blurry]: the sharpness check thinks it may be out of focus. */
+class Photo(val id: String, var rot: Int = 0, var blurry: Boolean = false)
 
 /**
  * Today's photos, in PDF order. They stay on the phone until the batch is cleared.
@@ -23,7 +24,7 @@ class Batch private constructor(context: Context) {
 
     fun save() {
         val arr = JSONArray()
-        items.forEach { arr.put(JSONObject().put("id", it.id).put("rot", it.rot)) }
+        items.forEach { arr.put(JSONObject().put("id", it.id).put("rot", it.rot).put("blurry", it.blurry)) }
         val tmp = File(index.path + ".tmp")
         tmp.writeText(arr.toString())
         if (!tmp.renameTo(index)) {
@@ -49,7 +50,7 @@ class Batch private constructor(context: Context) {
             val arr = JSONArray(index.readText())
             for (i in 0 until arr.length()) {
                 val o = arr.getJSONObject(i)
-                val p = Photo(o.getString("id"), o.optInt("rot", 0))
+                val p = Photo(o.getString("id"), o.optInt("rot", 0), o.optBoolean("blurry", false))
                 if (photoFile(p).exists() && thumbFile(p).exists()) items.add(p)
             }
         }

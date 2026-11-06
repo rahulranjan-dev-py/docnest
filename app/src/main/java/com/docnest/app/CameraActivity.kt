@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
-import android.graphics.Bitmap
 import android.graphics.Color
 import android.os.Bundle
 import android.util.Size
@@ -212,11 +211,11 @@ class CameraActivity : AppCompatActivity() {
                 // On the saver thread: make it upright, shrink it and add it to the batch.
                 val exif = runCatching { shot.inputStream().use { Images.readExif(it) } }
                     .getOrElse { Images.Exif(0, 0L) }
-                val thumb = runCatching {
+                val stored = runCatching {
                     Images.store({ shot.inputStream() }, exif.degrees, batch.photoFile(p), batch.thumbFile(p))
                 }.getOrNull()
                 shot.delete()
-                runOnUiThread { saved(p, thumb) }
+                runOnUiThread { saved(p, stored) }
             }
 
             override fun onError(exception: ImageCaptureException) {
@@ -226,14 +225,19 @@ class CameraActivity : AppCompatActivity() {
         })
     }
 
-    private fun saved(p: Photo, thumb: Bitmap?) {
+    private fun saved(p: Photo, stored: Images.Stored?) {
         pending--
-        if (thumb != null) {
+        if (stored != null) {
+            p.blurry = stored.blurry
             batch.items.add(p)
             batch.save()
             added++
-            lastThumb.setImageBitmap(thumb)
-            status.text = "Keep going, or tap Done when you're finished"
+            lastThumb.setImageBitmap(stored.thumb)
+            status.text = if (stored.blurry) {
+                "Page ${batch.items.size} may be blurry. Hold steady and take it again."
+            } else {
+                "Keep going, or tap Done when you're finished"
+            }
             setResult(RESULT_OK, Intent().putExtra(EXTRA_ADDED, added))
         } else {
             batch.deleteFiles(p)

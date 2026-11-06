@@ -5,6 +5,9 @@ import java.util.Locale
 
 enum class PageSize { A4, PHOTO }
 
+/** A line of recognised text and its box on the photo, in photo pixels. */
+class TextLine(val text: String, val left: Int, val top: Int, val right: Int, val bottom: Int)
+
 private const val A4_SHORT = 595.28
 private const val A4_LONG = 841.89
 
@@ -88,15 +91,18 @@ class PdfWriter(
         begin(3); put("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>\nendobj\n")
     }
 
-    /** A photo page, stored as the JPEG itself. */
-    fun addPage(jpeg: ByteArray, w: Int, h: Int) =
-        addImagePage("/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode", jpeg, w, h)
+    /** A photo page, stored as the JPEG itself. [text]: recognised lines, for a searchable page. */
+    fun addPage(jpeg: ByteArray, w: Int, h: Int, text: List<TextLine> = emptyList()) =
+        addImagePage("/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode", jpeg, w, h, text)
 
     /** A black & white page: 1 bit per pixel (1 = white), zlib-compressed, as [Enhance.bitonal] makes it. */
-    fun addBitonalPage(page: Enhance.Bitonal) =
-        addImagePage("/ColorSpace /DeviceGray /BitsPerComponent 1 /Filter /FlateDecode", page.data, page.width, page.height)
+    fun addBitonalPage(page: Enhance.Bitonal, text: List<TextLine> = emptyList()) =
+        addImagePage(
+            "/ColorSpace /DeviceGray /BitsPerComponent 1 /Filter /FlateDecode",
+            page.data, page.width, page.height, text,
+        )
 
-    private fun addImagePage(format: String, data: ByteArray, w: Int, h: Int) {
+    private fun addImagePage(format: String, data: ByteArray, w: Int, h: Int, text: List<TextLine>) {
         val i = index++
         val lay = layout(w, h, size, footer != null)
         val page = 4 + 3 * i
@@ -110,6 +116,7 @@ class PdfWriter(
         )
 
         var s = "q ${num(lay.iw)} 0 0 ${num(lay.ih)} ${num(lay.ix)} ${num(lay.iy)} cm /Im0 Do Q\n"
+        if (text.isNotEmpty()) s += textLayer(text, lay, w, h)
         if (footer != null) {
             val prefix = if (footer.isNotEmpty()) "$footer   |   " else ""
             val t = escape(asciiOnly(prefix + "Page ${i + 1} of $pageCount"))
@@ -121,6 +128,30 @@ class PdfWriter(
         begin(image)
         put("<< /Type /XObject /Subtype /Image /Width $w /Height $h $format /Length ${data.size} >>\nstream\n")
         put(data); put("\nendstream\nendobj\n")
+    }
+
+    /**
+     * Invisible text (render mode 3) laid over each recognised line, so a PDF viewer can search
+     * and select it. Each line is sized to its box: font size from the height, and the width
+     * stretched with Tz, since Helvetica averages about half an em per character.
+     * Wrapped in q…Q so the invisible mode doesn't carry over to the footer.
+     */
+    private fun textLayer(lines: List<TextLine>, lay: Layout, w: Int, h: Int): String {
+        val sx = lay.iw / w
+        val sy = lay.ih / h
+        val t = StringBuilder("q BT 3 Tr\n")
+        for (line in lines) {
+            val words = asciiOnly(line.text)
+            val lineH = (line.bottom - line.top) * sy
+            val lineW = (line.right - line.left) * sx
+            if (words.isEmpty() || lineH <= 0 || lineW <= 0) continue
+            val fontSize = lineH * 0.85
+            val stretch = (100 * lineW / (words.length * fontSize * 0.5)).coerceIn(10.0, 1000.0)
+            val x = lay.ix + line.left * sx
+            val y = lay.iy + (h - line.bottom) * sy + lineH * 0.2
+            t.append("/F1 ${num(fontSize)} Tf ${num(stretch)} Tz 1 0 0 1 ${num(x)} ${num(y)} Tm (${escape(words)}) Tj\n")
+        }
+        return t.append("ET Q\n").toString()
     }
 
     fun finish() {

@@ -60,6 +60,7 @@ class PhotoAdapter(
         val box: View = v.findViewById(R.id.thumbBox)
         val thumb: ImageView = v.findViewById(R.id.thumb)
         val tab: TextView = v.findViewById(R.id.tab)
+        val blurBadge: View = v.findViewById(R.id.blurBadge)
         val rot: View = v.findViewById(R.id.rotBtn)
         val del: View = v.findViewById(R.id.delBtn)
     }
@@ -83,7 +84,8 @@ class PhotoAdapter(
         val n = position + 1
         h.thumb.setImageBitmap(thumb(p))
         h.tab.text = n.toString()
-        h.box.contentDescription = "View page $n"
+        h.blurBadge.visibility = if (p.blurry) View.VISIBLE else View.GONE
+        h.box.contentDescription = if (p.blurry) "View page $n. It may be blurry." else "View page $n"
         h.rot.contentDescription = "Rotate page $n"
         h.del.contentDescription = "Delete page $n"
         for (v in listOf(h.box, h.rot, h.del)) v.isEnabled = enabled
