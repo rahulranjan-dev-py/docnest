@@ -46,16 +46,20 @@ Every build from `main` is published as a GitHub Release named `DocNest 1.<build
 APK attached. The app reads the latest release to offer updates, so the repository must be public.
 
 Every release is signed with the same key, so a new version installs over the old one and keeps your
-pages. Set this up once, before the first release:
+pages. The key lives only in the repository's secrets (**Settings → Secrets and variables → Actions**),
+never in the code:
 
-1. Open the repository's **Settings → Secrets and variables → Actions** and click **New repository
-   secret**.
-2. **Name:** `SIGNING_PASSWORD`. **Secret:** a long password you make up, at least 25 letters and
-   numbers. Keep a copy in a safe place, such as a password manager. Click **Add secret**.
+| Secret | What it holds |
+|---|---|
+| `KEYSTORE_BASE64` | The keystore file, converted to text (base64) |
+| `KEYSTORE_PASSWORD` | The password that opens the keystore |
+| `KEY_ALIAS` | The name of the key inside the keystore (`docnest`) |
+| `KEY_PASSWORD` | The key's own password (the same as `KEYSTORE_PASSWORD` for this keystore) |
 
-The next build creates the signing key, locks it with that password, and saves it as
-`app/release.keystore`. Only GitHub's build can unlock it. Never delete the secret: without it, new
-versions can't be signed to install over the old ones.
+If any of them is missing, the build stops instead of publishing an APK signed with another key. Keep
+your own copy of the keystore file and its password somewhere safe, such as a password manager:
+GitHub never shows a secret again once it is saved, and without that key, new versions can't install
+over the old ones.
 
 ## Or build the app in Android Studio (on this computer)
 

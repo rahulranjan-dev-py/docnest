@@ -22,24 +22,27 @@ android {
         versionName = "1.$buildNumber"
     }
 
-    // Releases are signed with app/release.keystore, which is locked with the SIGNING_PASSWORD secret
-    // that only GitHub's build can read. Without that password (in Android Studio, say) the debug key is used.
+    // Releases are signed with the key in the repository's secrets: GitHub's build writes KEYSTORE_BASE64
+    // to app/release.keystore and passes KEYSTORE_PASSWORD, KEY_ALIAS and KEY_PASSWORD as environment
+    // variables. Without them (in Android Studio, say) the debug key is used.
     val releaseKey = file("release.keystore")
-    val signingPassword: String? = System.getenv("SIGNING_PASSWORD")
+    val storePass: String? = System.getenv("KEYSTORE_PASSWORD")
+    val alias: String? = System.getenv("KEY_ALIAS")
+    val keyPass: String? = System.getenv("KEY_PASSWORD")
     signingConfigs {
         create("release") {
             storeFile = releaseKey
-            storeType = "pkcs12"
-            storePassword = signingPassword
-            keyAlias = "docnest"
-            keyPassword = signingPassword
+            storePassword = storePass
+            keyAlias = alias
+            keyPassword = keyPass
         }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
-            val canSign = releaseKey.exists() && !signingPassword.isNullOrEmpty()
+            val canSign = releaseKey.exists() &&
+                !storePass.isNullOrEmpty() && !alias.isNullOrEmpty() && !keyPass.isNullOrEmpty()
             signingConfig = signingConfigs.getByName(if (canSign) "release" else "debug")
         }
     }

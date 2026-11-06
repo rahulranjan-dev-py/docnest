@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  # Lets the build save the signing key once, and publish releases.
+  # Lets the build publish releases.
   contents: write
 
 jobs:
@@ -23,26 +23,23 @@ jobs:
           java-version: 17
 
       # Every release must be signed with the same key, or updates won't install over each other.
-      # The first build makes the key, locked with the SIGNING_PASSWORD secret, and saves it in the
-      # repository; later builds reuse it. Without that password the saved key is useless.
-      - name: Get the signing key
+      # The key lives only in the repository's secrets: KEYSTORE_BASE64 (the keystore file as text),
+      # KEYSTORE_PASSWORD, KEY_ALIAS and KEY_PASSWORD. A missing one stops the build rather than
+      # letting it publish an APK signed with some other key.
+      - name: Unpack the signing key
         env:
-          SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          if [ -z "$SIGNING_PASSWORD" ]; then
-            echo "::error::Add the SIGNING_PASSWORD secret first (see README: Releases and updates)."
-            exit 1
-          fi
-          if [ ! -f app/release.keystore ]; then
-            keytool -genkeypair -keystore app/release.keystore -storetype PKCS12 \
-              -storepass:env SIGNING_PASSWORD -alias docnest -keyalg RSA -keysize 3072 \
-              -validity 10000 -dname "CN=DocNest"
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add app/release.keystore
-            git commit -m "Add DocNest's signing key, locked with the SIGNING_PASSWORD secret"
-            git push origin HEAD:${{ github.ref_name }}
-          fi
+          for name in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Add the $name secret first (see README: Releases and updates)."
+              exit 1
+            fi
+          done
+          printf '%s' "$KEYSTORE_BASE64" | tr -d ' \r\n' | base64 -d > app/release.keystore
 
       # v5, not v6: v6 moved its caching into a closed-source part with separate terms of use.
       - uses: gradle/actions/setup-gradle@v5
@@ -51,7 +48,9 @@ jobs:
 
       - name: Build the APK
         env:
-          SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           gradle assembleRelease -PbuildNumber=${{ github.run_number }}
           cp app/build/outputs/apk/release/app-release.apk DocNest-1.${{ github.run_number }}.apk

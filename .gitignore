@@ -9,3 +9,6 @@ captures/
 apk/
 .externalNativeBuild/
 .cxx/
+# The signing key lives in the repository's secrets, never in the code.
+*.keystore
+*.jks
