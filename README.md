@@ -13,8 +13,9 @@ into a PDF.
   photo-size pages, file name, and an optional footer with the date and page numbers.
 - **Share anywhere.** After **Make PDF**, the file is saved in **Downloads** and the share screen
   opens, so you can send it on WhatsApp, Gmail or any other app.
-- **Updates itself.** DocNest checks GitHub for a new version twice a day and offers to install it.
-  You can also tap **Check for updates** in the settings sheet.
+- **Updates itself.** When a new version is out, a card appears at the top: **What's new**, **Later**,
+  **Update**, or ✕ to skip that version. Every download is checked against the release's SHA-256
+  checksum before it can be installed. You can also tap **Check for updates** in the settings sheet.
 - **Private.** No account, no ads, no tracking. Pages stay on the phone until you tap **Clear**. The
   only thing DocNest does online is check GitHub for updates.
 
@@ -35,15 +36,30 @@ GitHub builds the APK for free on its own computers. You only need a GitHub acco
 3. Check that the upload included the `.github` folder: it holds the build instructions. If it is
    missing, click **Add file → Create new file**, type `.github/workflows/build-apk.yml` as the name,
    paste in the contents of that file from this folder, and click **Commit changes**.
-4. Open the **Actions** tab. A "Build APK" run starts by itself and takes about 5–10 minutes. A green
-   tick means it worked. A red cross means it failed: open it to read the error.
-5. Click the finished run, scroll to **Artifacts** and download **DocNest.apk**. You can do this
-   straight from your phone's browser (signed in to GitHub) and then tap the file to install it.
+4. Open the **Actions** tab. A "Build check" run starts by itself and takes a few minutes. A green
+   tick means the app builds. A red cross means it failed: open it to read the error.
+5. To get an APK you can install, make a release (see below).
 
 ## Releases and updates
 
-Every build from `main` is published as a GitHub Release named `DocNest 1.<build number>`, with the
-APK attached. The app reads the latest release to offer updates, so the repository must be public.
+Pushes to `main` are only checked. A release is made when you choose, in either of two ways:
+
+- **On GitHub:** **Actions → Release → Run workflow**. It picks the next number itself.
+- **From a computer:** push a tag with the next number, for example `git tag v1.7` then
+  `git push origin v1.7`.
+
+Each release is named `DocNest 1.<number>` and carries:
+
+- `DocNest-1.<number>.apk`, the app;
+- `DocNest-latest.apk`, the same file under a name that never changes, so this link always gets the
+  newest version: <https://github.com/rahulranjan-dev-py/docnest/releases/latest/download/DocNest-latest.apk>;
+- `SHA256SUMS.txt`, the checksums the app uses to check its download;
+- release notes: one line per change since the previous release, shown in the app under
+  **What's new**.
+
+Before publishing, the build checks that the key opens with your secrets, and that the finished APK
+carries that key's certificate. The app reads the latest release to offer updates, so the repository
+must be public.
 
 Every release is signed with the same key, so a new version installs over the old one and keeps your
 pages. The key lives only in the repository's secrets (**Settings → Secrets and variables → Actions**),

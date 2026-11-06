@@ -1,0 +1,27 @@
+# Checks that every push to main still builds. Nothing is published: releases are made by
+# release.yml, only when you choose.
+name: Build check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 17
+
+      # v5, not v6: v6 moved its caching into a closed-source part with separate terms of use.
+      - uses: gradle/actions/setup-gradle@v5
+        with:
+          gradle-version: 8.14.3
+
+      - name: Build
+        run: gradle assembleDebug

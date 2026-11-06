@@ -5,9 +5,9 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
-// GitHub passes its build number, so every release has a higher versionCode than the one before.
-// The in-app updater compares it with the number in the latest release's tag (v1.<build number>).
-val buildNumber = (findProperty("buildNumber") as String?)?.toIntOrNull() ?: 1
+// The release workflow passes the number from the release tag (v1.<number>): it becomes the
+// versionCode, which the in-app updater compares with the number in the latest release's tag.
+val versionNumber = (findProperty("versionNumber") as String?)?.toIntOrNull() ?: 1
 
 android {
     namespace = "com.docnest.app"
@@ -18,8 +18,8 @@ android {
         minSdk = 26
         // 34 keeps the classic layout below the status bar on Android 15+.
         targetSdk = 34
-        versionCode = buildNumber
-        versionName = "1.$buildNumber"
+        versionCode = versionNumber
+        versionName = "1.$versionNumber"
     }
 
     // Releases are signed with the key in the repository's secrets: GitHub's build writes KEYSTORE_BASE64

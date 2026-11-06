@@ -68,6 +68,7 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
     private lateinit var galleryBtn: MaterialButton
     private lateinit var settingsBtn: View
     private lateinit var clearBtn: View
+    private lateinit var updateBanner: UpdateBanner
     private var busy = false
     private var built: Built? = null
 
@@ -150,11 +151,13 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
         clearBtn.setOnClickListener { confirmClear() }
         makeBtn.setOnClickListener { onMake() }
 
+        updateBanner = UpdateBanner(this, findViewById(R.id.updateBanner), ::install) { text, long -> note(text, long) }
         refresh()
-        val updates = getSharedPreferences("updates", MODE_PRIVATE)
-        if (savedInstanceState == null && System.currentTimeMillis() - updates.getLong("lastCheck", 0) > 12 * 3_600_000L) {
-            checkForUpdate(manual = false)
-        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        updateBanner.onAppOpened()
     }
 
     override fun onResume() {
@@ -411,7 +414,7 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
         v.findViewById<TextView>(R.id.versionText).text = "Version ${Updater.versionName(this)}"
         v.findViewById<View>(R.id.updateBtn).setOnClickListener {
             sheet.dismiss()
-            checkForUpdate(manual = true)
+            updateBanner.check(manual = true)
         }
         v.findViewById<View>(R.id.doneBtn).setOnClickListener { sheet.dismiss() }
 
@@ -446,52 +449,7 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
             .show()
     }
 
-    // ---------- updates ----------
-
-    private fun checkForUpdate(manual: Boolean) {
-        lifecycleScope.launch {
-            val r = withContext(Dispatchers.IO) { runCatching { Updater.latest() } }
-            if (r.isSuccess) {
-                getSharedPreferences("updates", MODE_PRIVATE).edit()
-                    .putLong("lastCheck", System.currentTimeMillis()).apply()
-            }
-            val release = r.getOrNull()
-            when {
-                release != null && release.version > Updater.installedVersion(this@MainActivity) -> offerUpdate(release)
-                !manual -> Unit
-                r.isFailure -> note("Couldn't check for updates. Check your internet connection and try again.", long = true)
-                else -> note("DocNest is up to date")
-            }
-        }
-    }
-
-    private fun offerUpdate(r: Updater.Release) {
-        Snackbar.make(root, "${r.name} is available", Snackbar.LENGTH_INDEFINITE)
-            .setAnchorView(dock)
-            .setAction("Update") { downloadUpdate(r) }
-            .show()
-    }
-
-    private fun downloadUpdate(r: Updater.Release) {
-        if (busy) return
-        setBusy(true)
-        setProgress("Downloading update…", 0f)
-        lifecycleScope.launch {
-            try {
-                val apk = withContext(Dispatchers.IO) {
-                    Updater.download(this@MainActivity, r) { f ->
-                        runOnUiThread { setProgress("Downloading update… ${(f * 100).toInt()}%", f) }
-                    }
-                }
-                setBusy(false)
-                install(apk)
-            } catch (e: Throwable) {
-                if (e is CancellationException) throw e
-                setBusy(false)
-                note("Couldn't download the update. Check your internet connection and try again.", long = true)
-            }
-        }
-    }
+    // ---------- updates (checking and downloading live in UpdateBanner) ----------
 
     private fun install(apk: File) {
         if (!Updater.canInstall(this)) {

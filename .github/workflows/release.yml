@@ -1,0 +1,133 @@
+# Publishes a DocNest release: the signed APK, the same APK under a fixed "latest" name, and
+# SHA-256 checksums that the app checks every download against.
+#
+# Runs when a version tag is pushed (v1.6, v1.7, ...), or by hand from the Actions tab
+# ("Run workflow"), which picks the next number itself.
+#
+# Needs four repository secrets: KEYSTORE_BASE64 (the keystore file as text), KEYSTORE_PASSWORD,
+# KEY_ALIAS and KEY_PASSWORD.
+name: Release
+
+on:
+  push:
+    tags: ["v1.*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write # to publish the release
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # every tag and commit, for the version number and the release notes
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 17
+
+      # Tags are v1.<number>, and the number becomes the versionCode. Copies of DocNest from 1.4
+      # and 1.5 compare that last number with their own, so the scheme must stay this way.
+      - name: Work out the version
+        id: v
+        run: |
+          numbers() { git tag -l 'v1.*' | sed 's/^v1\.//' | grep -E '^[0-9]+$' | sort -n; }
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            tag="$GITHUB_REF_NAME"
+          else
+            last=$(numbers | tail -1)
+            tag="v1.$(( ${last:-0} + 1 ))"
+          fi
+          number="${tag#v1.}"
+          case "$number" in
+            ''|*[!0-9]*) echo "::error::Release tags look like v1.6, not $tag."; exit 1 ;;
+          esac
+          prev=$(numbers | awk -v n="$number" '$1 < n' | tail -1)
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+          echo "prev=${prev:+v1.$prev}" >> "$GITHUB_OUTPUT"
+          echo "Releasing $tag (previous: ${prev:+v1.$prev})"
+
+      # Shown in the app under "What's new": one line per change since the previous release.
+      - name: Write the release notes
+        env:
+          PREV: ${{ steps.v.outputs.prev }}
+        run: |
+          mkdir -p dist
+          range=HEAD
+          [ -n "$PREV" ] && range="$PREV..HEAD"
+          git log --no-merges --pretty='- %s' "$range" > dist/NOTES.md
+          [ -s dist/NOTES.md ] || echo "- Small fixes and improvements." > dist/NOTES.md
+          cat dist/NOTES.md
+
+      - name: Unpack and check the signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          for name in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Add the $name secret first (see README: Releases and updates)."
+              exit 1
+            fi
+          done
+          printf '%s' "$KEYSTORE_BASE64" | tr -d ' \r\n' | base64 -d > app/release.keystore
+          if ! keytool -list -keystore app/release.keystore -storepass:env KEYSTORE_PASSWORD -alias "$KEY_ALIAS" > /dev/null 2>&1; then
+            echo "::error::Couldn't open the key. KEYSTORE_BASE64 may be incomplete, or KEYSTORE_PASSWORD or KEY_ALIAS may be wrong."
+            exit 1
+          fi
+
+      # v5, not v6: v6 moved its caching into a closed-source part with separate terms of use.
+      - uses: gradle/actions/setup-gradle@v5
+        with:
+          gradle-version: 8.14.3
+
+      - name: Build the APK
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: gradle assembleRelease -PversionNumber=${{ steps.v.outputs.number }}
+
+      # The APK must carry the release key, never the debug key Gradle falls back to without secrets.
+      - name: Check the APK's signature
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          apk=app/build/outputs/apk/release/app-release.apk
+          norm() { tr -d ': ' | tr 'A-F' 'a-f'; }
+          want=$(keytool -list -v -keystore app/release.keystore -storepass:env KEYSTORE_PASSWORD -alias "$KEY_ALIAS" \
+            | grep -m1 'SHA256:' | sed 's/.*SHA256: *//' | norm)
+          apksigner=$(ls -d "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          have=$("$apksigner" verify --print-certs "$apk" | grep -m1 'certificate SHA-256 digest' | sed 's/.*: *//' | norm)
+          echo "key: $want"
+          echo "apk: $have"
+          if [ -z "$want" ] || [ "$want" != "$have" ]; then
+            echo "::error::The APK isn't signed with the release key."
+            exit 1
+          fi
+
+      - name: Prepare the files
+        run: |
+          apk="DocNest-1.${{ steps.v.outputs.number }}.apk"
+          cp app/build/outputs/apk/release/app-release.apk "dist/$apk"
+          # A fixed name for a link that always gets the newest version:
+          # https://github.com/<owner>/docnest/releases/latest/download/DocNest-latest.apk
+          cp "dist/$apk" dist/DocNest-latest.apk
+          (cd dist && sha256sum *.apk > SHA256SUMS.txt && cat SHA256SUMS.txt)
+          rm -f app/release.keystore
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.v.outputs.tag }}" dist/*.apk dist/SHA256SUMS.txt \
+            --title "DocNest 1.${{ steps.v.outputs.number }}" \
+            --notes-file dist/NOTES.md \
+            --target "${{ github.sha }}"
