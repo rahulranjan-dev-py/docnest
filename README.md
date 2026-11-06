@@ -9,8 +9,15 @@ into a PDF.
   were taken before today.
 - **Check before you make the PDF.** Hold a page and drag it to reorder. Rotate or delete it (with
   Undo). Tap a page to see it large.
-- **PDF settings** (the sliders button at the top). Quality, colour or black & white, A4 or
-  photo-size pages, file name, and an optional footer with the date and page numbers.
+- **PDF settings** (the sliders button at the top). Quality, A4 or photo-size pages, an optional
+  footer with the date and page numbers, and how pages look:
+  - **Colour:** the photo as taken.
+  - **Document:** like a scanner. Lighting is evened out, shadows and yellowed paper turn white,
+    and text is sharpened.
+  - **B&W:** pure black text on white, judged spot by spot so faint print and shaded areas stay
+    readable. Pages are stored at 1 bit per pixel, so the PDF is much smaller. Best for pages of
+    text; photos in the article turn into rough black-and-white patterns.
+- **File names** are always `Scan_<date>.pdf`; a second PDF on the same day gets "(1)" added.
 - **Share anywhere.** After **Make PDF**, the file is saved in **Downloads** and the share screen
   opens, so you can send it on WhatsApp, Gmail or any other app.
 - **My documents** (the folder button at the top). Every PDF DocNest has made, newest first, with a

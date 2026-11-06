@@ -283,7 +283,7 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
 
         fun showImage() {
             lifecycleScope.launch {
-                val b = withContext(Dispatchers.IO) { Images.load(batch.photoFile(p), 1600, p.rot, false) }
+                val b = withContext(Dispatchers.IO) { Images.load(batch.photoFile(p), 1600, p.rot) }
                 img.setImageBitmap(b)
             }
         }
@@ -388,7 +388,13 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
                 Quality.HIGH -> R.id.qHigh
             }
         )
-        colour.check(if (settings.grey) R.id.cGrey else R.id.cColour)
+        colour.check(
+            when (settings.colour) {
+                ColourMode.COLOUR -> R.id.cColour
+                ColourMode.DOCUMENT -> R.id.cDocument
+                ColourMode.BW -> R.id.cBw
+            }
+        )
         page.check(if (settings.page == PageSize.A4) R.id.pA4 else R.id.pPhoto)
         explain(
             quality, v.findViewById(R.id.qualityHint), mapOf(
@@ -399,8 +405,9 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
         )
         explain(
             colour, v.findViewById(R.id.colourHint), mapOf(
-                R.id.cColour to "Keeps the photos in full colour.",
-                R.id.cGrey to "Crisper text on paper, and a smaller file.",
+                R.id.cColour to "Keeps the photos exactly as taken.",
+                R.id.cDocument to "Even lighting, white paper and crisper text, like a scanner.",
+                R.id.cBw to "Sharp black text on white, and the smallest files. Best for text without photos.",
             )
         )
         explain(
@@ -426,7 +433,11 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
                 R.id.qHigh -> Quality.HIGH
                 else -> Quality.STANDARD
             }
-            settings.grey = colour.checkedButtonId == R.id.cGrey
+            settings.colour = when (colour.checkedButtonId) {
+                R.id.cDocument -> ColourMode.DOCUMENT
+                R.id.cBw -> ColourMode.BW
+                else -> ColourMode.COLOUR
+            }
             settings.page = if (page.checkedButtonId == R.id.pPhoto) PageSize.PHOTO else PageSize.A4
             settings.footerOn = footOn.isChecked
             settings.footer = footIn.text.toString()
@@ -484,7 +495,9 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
         val list = batch.items.toList()
         val n = list.size
         val quality = settings.quality
-        val grey = settings.grey
+        val colour = settings.colour
+        // 1-bit text needs every pixel to stay smooth, and is small anyway, so B&W ignores the size setting.
+        val edge = if (colour == ColourMode.BW) Images.STORE_EDGE else quality.edge
         val page = settings.page
         val footer = settings.footerLine()
         val name = settings.fileName()
@@ -501,9 +514,13 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
                         val pdf = PdfWriter(out, n, page, footer)
                         list.forEachIndexed { i, p ->
                             withContext(Dispatchers.Main) { setProgress("Preparing page ${i + 1} of $n…", i.toFloat() / n) }
-                            val bmp = Images.load(batch.photoFile(p), quality.edge, p.rot, grey)
+                            val bmp = Images.load(batch.photoFile(p), edge, p.rot, colour)
                                 ?: error("Page ${i + 1} could not be opened")
-                            pdf.addPage(Images.jpeg(bmp, quality.jpegQuality), bmp.width, bmp.height)
+                            if (colour == ColourMode.BW) {
+                                pdf.addBitonalPage(Enhance.bitonal(bmp))
+                            } else {
+                                pdf.addPage(Images.jpeg(bmp, quality.jpegQuality), bmp.width, bmp.height)
+                            }
                             bmp.recycle()
                         }
                         pdf.finish()

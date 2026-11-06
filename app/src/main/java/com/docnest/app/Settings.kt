@@ -27,9 +27,16 @@ class Settings(context: Context) {
         get() = Quality.entries.firstOrNull { it.name == prefs.getString("quality", null) } ?: Quality.STANDARD
         set(v) = prefs.edit { putString("quality", v.name) }
 
-    var grey: Boolean
-        get() = prefs.getBoolean("grey", false)
-        set(v) = prefs.edit { putBoolean("grey", v) }
+    // Replaces the old on/off "grey" setting: someone who had it on gets B&W, someone who had
+    // chosen colour keeps Colour, and new installs start with the scanner-style Document look.
+    var colour: ColourMode
+        get() = ColourMode.entries.firstOrNull { it.name == prefs.getString("colour", null) }
+            ?: when {
+                !prefs.contains("grey") -> ColourMode.DOCUMENT
+                prefs.getBoolean("grey", false) -> ColourMode.BW
+                else -> ColourMode.COLOUR
+            }
+        set(v) = prefs.edit { putString("colour", v.name) }
 
     var page: PageSize
         get() = PageSize.entries.firstOrNull { it.name == prefs.getString("page", null) } ?: PageSize.A4
@@ -54,6 +61,6 @@ class Settings(context: Context) {
     }
 
     fun summary(): String =
-        quality.label + " · " + (if (grey) "B&W" else "Colour") + " · " +
+        quality.label + " · " + colour.label + " · " +
             (if (page == PageSize.A4) "A4" else "Photo size") + (if (footerOn) " · Footer" else "")
 }

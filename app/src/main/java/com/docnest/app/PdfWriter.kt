@@ -88,7 +88,15 @@ class PdfWriter(
         begin(3); put("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>\nendobj\n")
     }
 
-    fun addPage(jpeg: ByteArray, w: Int, h: Int) {
+    /** A photo page, stored as the JPEG itself. */
+    fun addPage(jpeg: ByteArray, w: Int, h: Int) =
+        addImagePage("/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode", jpeg, w, h)
+
+    /** A black & white page: 1 bit per pixel (1 = white), zlib-compressed, as [Enhance.bitonal] makes it. */
+    fun addBitonalPage(page: Enhance.Bitonal) =
+        addImagePage("/ColorSpace /DeviceGray /BitsPerComponent 1 /Filter /FlateDecode", page.data, page.width, page.height)
+
+    private fun addImagePage(format: String, data: ByteArray, w: Int, h: Int) {
         val i = index++
         val lay = layout(w, h, size, footer != null)
         val page = 4 + 3 * i
@@ -111,11 +119,8 @@ class PdfWriter(
         begin(contents); put("<< /Length ${sb.size} >>\nstream\n"); put(sb); put("endstream\nendobj\n")
 
         begin(image)
-        put(
-            "<< /Type /XObject /Subtype /Image /Width $w /Height $h /ColorSpace /DeviceRGB" +
-                " /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpeg.size} >>\nstream\n"
-        )
-        put(jpeg); put("\nendstream\nendobj\n")
+        put("<< /Type /XObject /Subtype /Image /Width $w /Height $h $format /Length ${data.size} >>\nstream\n")
+        put(data); put("\nendstream\nendobj\n")
     }
 
     fun finish() {

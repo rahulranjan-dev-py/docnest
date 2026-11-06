@@ -73,9 +73,15 @@
                 android:text="Colour" />
 
             <com.google.android.material.button.MaterialButton
-                android:id="@+id/cGrey"
+                android:id="@+id/cDocument"
                 style="@style/Widget.DocNest.Segment"
-                android:text="Black &amp; white" />
+                android:text="Document" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/cBw"
+                style="@style/Widget.DocNest.Segment"
+                android:contentDescription="Black and white"
+                android:text="B&amp;W" />
         </com.google.android.material.button.MaterialButtonToggleGroup>
 
         <TextView
