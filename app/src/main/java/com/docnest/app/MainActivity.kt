@@ -148,6 +148,7 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
         cameraBtn.setOnClickListener { openCamera.launch(Intent(this, CameraActivity::class.java)) }
         galleryBtn.setOnClickListener { pickPhotos.launch("image/*") }
         settingsBtn.setOnClickListener { showSettings() }
+        findViewById<View>(R.id.documentsBtn).setOnClickListener { openDocuments() }
         clearBtn.setOnClickListener { confirmClear() }
         makeBtn.setOnClickListener { onMake() }
 
@@ -214,11 +215,12 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
         progress.setProgressCompat((fraction * 1000).toInt(), true)
     }
 
-    /** A short note above the dock, gone after a few seconds. */
-    private fun note(text: String, long: Boolean = false) {
-        Snackbar.make(root, text, if (long) Snackbar.LENGTH_LONG else Snackbar.LENGTH_SHORT)
+    /** A short note above the dock, gone after a few seconds, with an optional button. */
+    private fun note(text: String, long: Boolean = false, action: Pair<String, () -> Unit>? = null) {
+        val bar = Snackbar.make(root, text, if (long) Snackbar.LENGTH_LONG else Snackbar.LENGTH_SHORT)
             .setAnchorView(dock)
-            .show()
+        if (action != null) bar.setAction(action.first) { action.second() }
+        bar.show()
     }
 
     // ---------- page cards ----------
@@ -508,16 +510,17 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
                     }
                     f
                 }
-                setProgress("Saving to Downloads…", 1f)
-                val inDownloads = withContext(Dispatchers.IO) { saveToDownloads(file) }
+                setProgress("Saving to My documents…", 1f)
+                val saved = withContext(Dispatchers.IO) { runCatching { Library.save(this@MainActivity, file) }.getOrNull() }
                 built = Built(file, key)
                 setBusy(false)
                 refresh()
                 val size = fmtBytes(file.length())
-                note(
-                    if (inDownloads) "Saved $name to Downloads ($size)" else "PDF ready ($size). Tap Share PDF to send it.",
-                    long = true,
-                )
+                if (saved != null) {
+                    note("Saved ${saved.name} ($size)", long = true, action = "View" to ::openDocuments)
+                } else {
+                    note("PDF ready ($size), but it couldn't be saved. Tap Share PDF to send it.", long = true)
+                }
                 share(file)
             } catch (e: Throwable) {
                 if (e is CancellationException) throw e
@@ -528,26 +531,8 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
         }
     }
 
-    /** Copies the PDF into the phone's Downloads folder (Android 10 and newer). */
-    private fun saveToDownloads(file: File): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return false
-        val values = ContentValues().apply {
-            put(MediaStore.MediaColumns.DISPLAY_NAME, file.name)
-            put(MediaStore.MediaColumns.MIME_TYPE, "application/pdf")
-            put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
-            put(MediaStore.MediaColumns.IS_PENDING, 1)
-        }
-        val uri = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values) ?: return false
-        return try {
-            contentResolver.openOutputStream(uri)!!.use { out -> file.inputStream().use { it.copyTo(out) } }
-            values.clear()
-            values.put(MediaStore.MediaColumns.IS_PENDING, 0)
-            contentResolver.update(uri, values, null, null)
-            true
-        } catch (e: Exception) {
-            contentResolver.delete(uri, null, null)
-            false
-        }
+    private fun openDocuments() {
+        startActivity(Intent(this, DocumentsActivity::class.java))
     }
 
     private fun share(file: File) {
@@ -564,7 +549,7 @@ fun pages(n: Int) = if (n == 1) "1 page" else "$n pages"
 
 private fun photos(n: Int) = if (n == 1) "1 photo" else "$n photos"
 
-private fun fmtBytes(b: Long): String =
+fun fmtBytes(b: Long): String =
     if (b >= 1048576) String.format(Locale.US, "%.1f MB", b / 1048576.0)
     else "${max(1, (b / 1024.0).roundToInt())} KB"
 

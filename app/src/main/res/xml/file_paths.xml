@@ -2,4 +2,7 @@
 <paths>
     <cache-path name="pdf" path="pdf/" />
     <cache-path name="updates" path="updates/" />
+    <!-- My documents on Android 8 and 9 (newer phones keep them in Downloads). -->
+    <external-files-path name="documents" path="Documents/" />
+    <files-path name="documents_internal" path="Documents/" />
 </paths>

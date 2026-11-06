@@ -13,6 +13,10 @@ into a PDF.
   photo-size pages, file name, and an optional footer with the date and page numbers.
 - **Share anywhere.** After **Make PDF**, the file is saved in **Downloads** and the share screen
   opens, so you can send it on WhatsApp, Gmail or any other app.
+- **My documents** (the folder button at the top). Every PDF DocNest has made, newest first, with a
+  preview of page 1. Tap one to open it, tap the star to keep it under **Favourites**, or use **⋮**
+  to share, rename or delete it. Deleting has an Undo. These are the same files as in Downloads, so a
+  rename or delete here changes the file there too.
 - **Updates itself.** When a new version is out, a card appears at the top: **What's new**, **Later**,
   **Update**, or ✕ to skip that version. Every download is checked against the release's SHA-256
   checksum before it can be installed. You can also tap **Check for updates** in the settings sheet.
@@ -110,7 +114,7 @@ over the old ones.
    large.
 3. Tap **Make PDF**. It is saved in Downloads and the share screen opens: choose WhatsApp, Gmail or
    any other app. Tap **Share PDF** to send it again.
-4. When you are finished, tap **Clear** to start a new batch.
+4. When you are finished, tap **Clear** to start a new batch. Your PDF stays in **My documents**.
 
 ---
 

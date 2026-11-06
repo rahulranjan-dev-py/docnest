@@ -36,6 +36,12 @@
             android:screenOrientation="portrait"
             android:theme="@style/Theme.DocNest.Camera" />
 
+        <activity
+            android:name=".DocumentsActivity"
+            android:exported="false"
+            android:label="My Documents"
+            android:parentActivityName=".MainActivity" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.files"

@@ -29,6 +29,14 @@
                 android:textAppearance="@style/TextAppearance.DocNest.Brand" />
 
             <com.google.android.material.button.MaterialButton
+                android:id="@+id/documentsBtn"
+                style="@style/Widget.DocNest.IconButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:contentDescription="My documents"
+                app:icon="@drawable/ic_folder" />
+
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/settingsBtn"
                 style="@style/Widget.DocNest.IconButton"
                 android:layout_width="wrap_content"
