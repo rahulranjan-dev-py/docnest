@@ -1,14 +1,13 @@
 package com.docnest.app
 
+import android.Manifest
 import android.app.Dialog
-import android.content.ContentValues
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.os.Environment
-import android.provider.MediaStore
 import android.view.View
 import android.widget.EditText
 import android.widget.ImageView
@@ -16,10 +15,13 @@ import android.widget.TextView
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.core.graphics.ColorUtils
 import androidx.core.view.isVisible
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.RecyclerView
@@ -36,13 +38,10 @@ import com.google.android.material.snackbar.Snackbar
 import com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanning
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.BufferedOutputStream
 import java.io.File
-import java.io.FileOutputStream
 import java.util.Calendar
 import java.util.Collections
 import java.util.Locale
@@ -53,9 +52,6 @@ import androidx.appcompat.R as AppCompatR
 import com.google.android.material.R as MaterialR
 
 class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
-
-    /** The last PDF made. Tapping the button again shares it without rebuilding, until something changes. */
-    private class Built(val file: File, val key: String)
 
     private lateinit var batch: Batch
     private lateinit var settings: Settings
@@ -73,9 +69,16 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
     private lateinit var galleryBtn: MaterialButton
     private lateinit var settingsBtn: View
     private lateinit var clearBtn: View
+    private lateinit var cancelBtn: View
     private lateinit var updateBanner: UpdateBanner
-    private var busy = false
-    private var built: Built? = null
+    private var adding = false // photos are being added to the batch
+
+    // The PDF is made by PdfJob, outside this screen, so it carries on when the screen is left.
+    private val making get() = PdfJob.running
+    private val busy get() = adding || making
+
+    /** The last PDF made. Tapping the button again shares it without rebuilding, until something changes. */
+    private val built get() = PdfJob.state.value as? PdfJob.Done
 
     private val pickPhotos = registerForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
         if (uris.isNotEmpty()) addFromGallery(uris)
@@ -94,6 +97,9 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
         val added = r.data?.getIntExtra(CameraActivity.EXTRA_ADDED, 0) ?: 0
         if (added > 0) note("${pages(added)} added")
     }
+
+    // Whatever the answer, the PDF is made: the permission only decides whether its notifications show.
+    private val askNotifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) { startPdf() }
 
     // An update waiting for the "install unknown apps" permission.
     private var pendingInstall: File? = null
@@ -150,6 +156,7 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
         galleryBtn = findViewById(R.id.galleryBtn)
         settingsBtn = findViewById(R.id.settingsBtn)
         clearBtn = findViewById(R.id.clearBtn)
+        cancelBtn = findViewById(R.id.cancelBtn)
 
         adapter = PhotoAdapter(batch, this)
         val grid = findViewById<RecyclerView>(R.id.grid)
@@ -164,9 +171,54 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
         findViewById<View>(R.id.documentsBtn).setOnClickListener { openDocuments() }
         clearBtn.setOnClickListener { confirmClear() }
         makeBtn.setOnClickListener { onMake() }
+        cancelBtn.setOnClickListener { PdfJob.cancel() }
 
         updateBanner = UpdateBanner(this, findViewById(R.id.updateBanner), ::install) { text, long -> note(text, long) }
         refresh()
+        lifecycleScope.launch { repeatOnLifecycle(Lifecycle.State.STARTED) { followPdf() } }
+    }
+
+    /** Shows how far the PDF is and, once, how it ended. Runs whenever this screen is showing. */
+    private suspend fun followPdf() {
+        // A PDF that finishes while this screen watches goes straight to the share screen. One
+        // that finished while DocNest was away is only announced: Share PDF is there for later.
+        var watched = false
+        PdfJob.state.collect { s ->
+            when (s) {
+                is PdfJob.Running -> {
+                    watched = true
+                    setProgress(s.text, s.fraction)
+                    showBusy()
+                    return@collect
+                }
+                is PdfJob.Done -> if (!s.seen) {
+                    s.seen = true
+                    announce(s)
+                    if (watched) share(s.file)
+                }
+                PdfJob.Failed -> {
+                    PdfJob.reset()
+                    PdfService.clearResult(this)
+                    note("Couldn't make the PDF. Try Small quality, or make it from fewer pages.", long = true)
+                }
+                PdfJob.Idle -> Unit
+            }
+            showBusy()
+            refresh()
+        }
+    }
+
+    private fun announce(d: PdfJob.Done) {
+        PdfService.clearResult(this)
+        val size = fmtBytes(d.file.length())
+        when {
+            d.saved == null -> note("PDF ready ($size), but it couldn't be saved. Tap Share PDF to send it.", long = true)
+            d.textMissing -> note(
+                "Saved ${d.saved.name}, but without searchable text: the text reader is still downloading. Try again in a few minutes.",
+                long = true, action = "View" to ::openDocuments,
+            )
+            else -> note("Saved ${d.saved.name} ($size)", long = true, action = "View" to ::openDocuments)
+        }
     }
 
     override fun onStart() {
@@ -216,10 +268,11 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
         clearBtn.isEnabled = !busy
     }
 
-    private fun setBusy(on: Boolean) {
-        busy = on
-        adapter.enabled = !on
-        statusRow.isVisible = on
+    /** Locks the pages and buttons while photos are being added or a PDF is being made. */
+    private fun showBusy() {
+        if (adapter.enabled == busy) adapter.enabled = !busy
+        statusRow.isVisible = busy
+        cancelBtn.isVisible = making
         updateEnabled()
     }
 
@@ -346,7 +399,8 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
 
     /** Adds photos to the batch. Gallery picks go in the order they were taken; [scanned] pages keep their order. */
     private fun addFromGallery(uris: List<Uri>, scanned: Boolean = false) {
-        setBusy(true)
+        adding = true
+        showBusy()
         lifecycleScope.launch {
             setProgress("Reading ${photos(uris.size)}…", 0f)
             val exifs = withContext(Dispatchers.IO) {
@@ -384,7 +438,8 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
                     refresh()
                 }
             }
-            setBusy(false)
+            adding = false
+            showBusy()
             refresh()
             val added = order.size - failed
             when {
@@ -498,7 +553,7 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
             .setMessage("This deletes all ${pages(batch.items.size)} from DocNest. PDFs you already saved stay in Downloads.")
             .setPositiveButton("Clear batch") { _, _ ->
                 batch.clear()
-                built = null
+                PdfJob.reset()
                 refresh()
                 note("Batch cleared")
             }
@@ -536,76 +591,32 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
     }
 
     private fun makePdf() {
-        val list = batch.items.toList()
-        val n = list.size
-        val quality = settings.quality
-        val colour = settings.colour
-        // 1-bit text needs every pixel to stay smooth, and is small anyway, so B&W ignores the size setting.
-        val edge = if (colour == ColourMode.BW) Images.STORE_EDGE else quality.edge
-        val page = settings.page
-        val footer = settings.footerLine()
-        val name = settings.fileName()
-        val searchable = settings.searchable
-        val key = stateKey()
-        setBusy(true)
-        lifecycleScope.launch {
-            val recognizer = if (searchable) Ocr.client() else null
-            val allText = StringBuilder()
-            var unread = 0 // pages where text recognition itself failed
-            try {
-                val file = withContext(Dispatchers.IO) {
-                    val dir = File(cacheDir, "pdf")
-                    dir.deleteRecursively()
-                    dir.mkdirs()
-                    val f = File(dir, name)
-                    BufferedOutputStream(FileOutputStream(f), 1 shl 16).use { out ->
-                        val pdf = PdfWriter(out, n, page, footer)
-                        list.forEachIndexed { i, p ->
-                            val step = if (searchable) "Reading page" else "Preparing page"
-                            withContext(Dispatchers.Main) { setProgress("$step ${i + 1} of $n…", i.toFloat() / n) }
-                            val bmp = Images.load(batch.photoFile(p), edge, p.rot, colour)
-                                ?: error("Page ${i + 1} could not be opened")
-                            val lines = recognizer?.let { Ocr.lines(it, bmp) }
-                            if (recognizer != null && lines == null) unread++
-                            lines?.forEach { allText.append(it.text).append('\n') }
-                            if (colour == ColourMode.BW) {
-                                pdf.addBitonalPage(Enhance.bitonal(bmp), lines.orEmpty())
-                            } else {
-                                pdf.addPage(Images.jpeg(bmp, quality.jpegQuality), bmp.width, bmp.height, lines.orEmpty())
-                            }
-                            bmp.recycle()
-                        }
-                        pdf.finish()
-                    }
-                    f
-                }
-                setProgress("Saving to My documents…", 1f)
-                val saved = withContext(Dispatchers.IO) {
-                    runCatching { Library.save(this@MainActivity, file) }.getOrNull()
-                        ?.also { if (allText.isNotBlank()) Library.saveText(this@MainActivity, it.key, allText.toString()) }
-                }
-                built = Built(file, key)
-                setBusy(false)
-                refresh()
-                val size = fmtBytes(file.length())
-                when {
-                    saved == null -> note("PDF ready ($size), but it couldn't be saved. Tap Share PDF to send it.", long = true)
-                    searchable && unread == n -> note(
-                        "Saved ${saved.name}, but without searchable text: the text reader is still downloading. Try again in a few minutes.",
-                        long = true, action = "View" to ::openDocuments,
-                    )
-                    else -> note("Saved ${saved.name} ($size)", long = true, action = "View" to ::openDocuments)
-                }
-                share(file)
-            } catch (e: Throwable) {
-                if (e is CancellationException) throw e
-                setBusy(false)
-                refresh()
-                note("Couldn't make the PDF. Try Small quality, or make it from fewer pages.", long = true)
-            } finally {
-                recognizer?.close()
-            }
+        // Android 13+ shows the progress and "PDF ready" notifications only with permission; asked once.
+        val ask = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !settings.askedNotifications &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        if (ask) {
+            settings.askedNotifications = true
+            askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            startPdf()
         }
+    }
+
+    private fun startPdf() {
+        if (busy || batch.items.isEmpty()) return
+        PdfJob.start(
+            this,
+            PdfJob.Request(
+                pages = batch.items.map { PdfJob.Page(batch.photoFile(it), it.rot) },
+                quality = settings.quality,
+                colour = settings.colour,
+                page = settings.page,
+                footer = settings.footerLine(),
+                name = settings.fileName(),
+                searchable = settings.searchable,
+                key = stateKey(),
+            ),
+        )
     }
 
     private fun openDocuments() {

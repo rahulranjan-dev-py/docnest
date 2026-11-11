@@ -13,7 +13,9 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
 import androidx.core.widget.doAfterTextChanged
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
@@ -23,6 +25,9 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
 import com.google.android.material.textfield.TextInputLayout
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -44,8 +49,10 @@ class DocumentsActivity : AppCompatActivity(), DocumentAdapter.Listener {
     private lateinit var adapter: DocumentAdapter
 
     private var all: List<Doc> = emptyList()
-    private var texts: Map<String, String> = emptyMap() // key → recognised text, lower case
-    private var query = ""
+    private var typed = "" // what is in the search box
+    private var query = "" // the search on screen: [typed], once [textMatches] has caught up with it
+    private var textMatches: Set<String> = emptySet() // keys of documents whose text has [query]
+    private var searching: Job? = null
     private var loaded = false
     private var loadFailed = false
     private var onlyFavourites = false
@@ -66,8 +73,8 @@ class DocumentsActivity : AppCompatActivity(), DocumentAdapter.Listener {
 
         findViewById<View>(R.id.backBtn).setOnClickListener { finish() }
         findViewById<EditText>(R.id.searchIn).doAfterTextChanged {
-            query = it?.toString()?.trim()?.lowercase().orEmpty()
-            render()
+            typed = it?.toString()?.trim()?.lowercase().orEmpty()
+            search()
         }
         findViewById<ChipGroup>(R.id.filter).setOnCheckedStateChangeListener { _, ids ->
             onlyFavourites = R.id.chipFavourites in ids
@@ -77,12 +84,14 @@ class DocumentsActivity : AppCompatActivity(), DocumentAdapter.Listener {
         val list = findViewById<RecyclerView>(R.id.list)
         list.layoutManager = LinearLayoutManager(this)
         list.adapter = adapter
-    }
 
-    // Reloaded every time, so files renamed or deleted in another app show correctly here.
-    override fun onStart() {
-        super.onStart()
-        load()
+        // Reloaded every time the screen comes back, so files renamed or deleted in another app show
+        // correctly, and again when a PDF being made in the background is finished.
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                PdfJob.state.map { it as? PdfJob.Done }.distinctUntilChanged().collect { load() }
+            }
+        }
     }
 
     override fun onStop() {
@@ -98,16 +107,29 @@ class DocumentsActivity : AppCompatActivity(), DocumentAdapter.Listener {
         lifecycleScope.launch {
             val result = withContext(Dispatchers.IO) {
                 runCatching {
-                    val docs = Library.list(this@DocumentsActivity)
-                    val found = docs.mapNotNull { d -> Library.text(this@DocumentsActivity, d.key)?.let { d.key to it.lowercase() } }
-                    docs to found.toMap()
+                    Library.list(this@DocumentsActivity).also { docs ->
+                        runCatching { SearchIndex.importOldFiles(this@DocumentsActivity, docs) }
+                    }
                 }
             }
             loaded = true
             loading.isVisible = false
             loadFailed = result.isFailure
-            all = result.getOrNull()?.first.orEmpty()
-            texts = result.getOrNull()?.second.orEmpty()
+            all = result.getOrDefault(emptyList())
+            search()
+        }
+    }
+
+    /** Looks [typed] up in the text of searchable PDFs, off the main thread, then shows the result. */
+    private fun search() {
+        searching?.cancel()
+        val q = typed
+        searching = lifecycleScope.launch {
+            val found = if (q.isEmpty()) emptySet() else withContext(Dispatchers.IO) {
+                runCatching { SearchIndex.search(this@DocumentsActivity, q) }.getOrDefault(emptySet())
+            }
+            query = q
+            textMatches = found
             render()
         }
     }
@@ -121,7 +143,7 @@ class DocumentsActivity : AppCompatActivity(), DocumentAdapter.Listener {
         val filtered = if (onlyFavourites) starred else present
         // Search looks at names, and inside PDFs that were made searchable.
         val shown = if (query.isEmpty()) filtered else filtered.filter { d ->
-            d.name.lowercase().contains(query) || texts[d.key]?.contains(query) == true
+            d.name.lowercase().contains(query) || d.key in textMatches
         }
         adapter.submit(shown, favs)
 
@@ -129,7 +151,7 @@ class DocumentsActivity : AppCompatActivity(), DocumentAdapter.Listener {
         when {
             query.isNotEmpty() && filtered.isNotEmpty() -> showEmpty(
                 "No matches for “$query”",
-                "Search looks in document names, and in the text of searchable PDFs.",
+                "Search looks in document names, and for words that start this way in searchable PDFs.",
                 "Clear search",
             ) { findViewById<EditText>(R.id.searchIn).setText("") }
             loadFailed -> showEmpty(

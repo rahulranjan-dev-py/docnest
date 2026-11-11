@@ -29,10 +29,15 @@ into a PDF.
 - **File names** are always `Scan_<date>.pdf`; a second PDF on the same day gets "(1)" added.
 - **Share anywhere.** After **Make PDF**, the file is saved in **Downloads** and the share screen
   opens, so you can send it on WhatsApp, Gmail or any other app.
+- **Long PDFs finish by themselves.** Making a PDF carries on if you switch to another app or lock
+  the phone. A notification shows how far it is, with a **Cancel** button, and another tells you
+  when the PDF is ready. Android 13 and newer ask once whether DocNest may show notifications; the
+  PDF is made either way.
 - **My documents** (the folder button at the top). Every PDF DocNest has made, newest first, with a
   preview of page 1. Tap one to open it, tap the star to keep it under **Favourites**, or use **⋮**
   to share, rename or delete it. Deleting has an Undo. **Search** finds documents by name, and by the
-  words inside searchable PDFs. These are the same files as in Downloads, so a rename or delete here
+  words inside searchable PDFs: type the start of one or more words, and it stays quick however many
+  documents you have. These are the same files as in Downloads, so a rename or delete here
   changes the file there too.
 - **Updates itself.** When a new version is out, a card appears at the top: **What's new**, **Later**,
   **Update**, or ✕ to skip that version. Every download is checked against the release's SHA-256

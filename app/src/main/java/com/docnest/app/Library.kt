@@ -85,8 +85,16 @@ object Library {
 
     // ---------- saving a new PDF ----------
 
-    /** Files a freshly made PDF into the library and returns it, or null if it couldn't be saved. */
-    fun save(context: Context, pdf: File): Doc? = if (usesMediaStore) saveToDownloads(context, pdf) else saveToFolder(context, pdf)
+    /**
+     * Files a freshly made PDF into the library and returns it, or null if it couldn't be saved.
+     * [text]: the words recognised in it (null when it isn't searchable), kept for search.
+     */
+    fun save(context: Context, pdf: File, text: String?): Doc? {
+        val doc = (if (usesMediaStore) saveToDownloads(context, pdf) else saveToFolder(context, pdf)) ?: return null
+        // Also clears text left under this key by a file that was deleted outside DocNest.
+        runCatching { SearchIndex.put(context, doc.key, text) }
+        return doc
+    }
 
     @RequiresApi(Build.VERSION_CODES.Q)
     private fun saveToDownloads(context: Context, pdf: File): Doc? {
@@ -162,7 +170,7 @@ object Library {
             setFavourite(context, doc.key, false)
             setFavourite(context, renamed.key, true)
         }
-        moveText(context, doc.key, renamed.key)
+        runCatching { SearchIndex.rename(context, doc.key, renamed.key) }
         return renamed
     }
 
@@ -179,29 +187,10 @@ object Library {
         }
         if (!gone) throw Failure(CANT_CHANGE)
         setFavourite(context, doc.key, false)
-        textFile(context, doc.key).delete()
+        runCatching { SearchIndex.remove(context, doc.key) }
     }
 
     private const val CANT_CHANGE = "DocNest can't change this file any more. Rename or delete it in your Files app."
-
-    // ---------- recognised text, for search ----------
-
-    private fun textFile(context: Context, key: String) =
-        File(File(context.filesDir, "text").apply { mkdirs() }, key.replace(Regex("[^A-Za-z0-9._-]"), "_") + ".txt")
-
-    /** Keeps the text recognised in a searchable PDF, so My documents can search inside it. */
-    fun saveText(context: Context, key: String, text: String) {
-        runCatching { textFile(context, key).writeText(text) }
-    }
-
-    /** The text recognised in [key]'s PDF, or null when it wasn't made searchable. Off the main thread. */
-    fun text(context: Context, key: String): String? =
-        textFile(context, key).takeIf { it.exists() }?.let { runCatching { it.readText() }.getOrNull() }
-
-    private fun moveText(context: Context, from: String, to: String) {
-        val f = textFile(context, from)
-        if (f.exists()) f.renameTo(textFile(context, to))
-    }
 
     fun favourites(context: Context): Set<String> =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getStringSet(KEY_FAVOURITES, emptySet()) ?: emptySet()

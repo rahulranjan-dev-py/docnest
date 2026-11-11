@@ -60,6 +60,11 @@ class Settings(context: Context) {
         get() = prefs.getString("footer", "") ?: ""
         set(v) = prefs.edit { putString("footer", v) }
 
+    /** Android 13+ asks before an app may show notifications. DocNest asks once, at the first PDF. */
+    var askedNotifications: Boolean
+        get() = prefs.getBoolean("askedNotifications", false)
+        set(v) = prefs.edit { putBoolean("askedNotifications", v) }
+
     // Always Scan_<date>.pdf; a second PDF on the same day becomes "Scan_<date> (1).pdf" in Downloads.
     fun fileName() = defaultName() + ".pdf"
 

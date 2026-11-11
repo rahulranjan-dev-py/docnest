@@ -9,6 +9,13 @@
     <!-- Only for checking GitHub for a newer DocNest and installing it. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- For making a long PDF while DocNest is in the background or the phone is locked: the
+         service that keeps the work going, its progress and "PDF ready" notifications, and
+         keeping the processor on until the PDF is done. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <application
         android:allowBackup="false"
@@ -18,7 +25,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.DocNest">
 
-        <!-- Turning the phone must not restart the screen, or a PDF being made would be lost. -->
+        <!-- Turning the phone must not restart the screen, or photos being added would be lost. -->
         <activity
             android:name=".MainActivity"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
@@ -41,6 +48,12 @@
             android:exported="false"
             android:label="My Documents"
             android:parentActivityName=".MainActivity" />
+
+        <!-- Runs while a PDF is being made (see PdfJob). -->
+        <service
+            android:name=".PdfService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
 
         <!-- Ask Play services to fetch the text-recognition model when DocNest is installed. -->
         <meta-data
