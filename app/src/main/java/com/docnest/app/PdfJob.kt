@@ -107,7 +107,9 @@ object PdfJob {
         try {
             val allText = StringBuilder()
             var unread = 0 // pages where text recognition itself failed
-            if (r.searchable) recognizer = Ocr.client()
+            // A text reader that won't start is treated like one that can't read yet: the PDF is
+            // still made, without its text.
+            if (r.searchable) recognizer = runCatching { Ocr.client() }.getOrNull()
             dir.deleteRecursively()
             dir.mkdirs()
             val file = File(dir, r.name)
