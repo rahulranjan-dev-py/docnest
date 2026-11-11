@@ -67,13 +67,18 @@ class UpdateBanner(
             val result = withContext(Dispatchers.IO) { runCatching { Updater.latest() } }
             if (result.isSuccess) prefs.edit().putLong(KEY_LAST_CHECK, System.currentTimeMillis()).apply()
             val newer = result.getOrNull()?.takeIf { it.version > Updater.installedVersion(activity) }
-            available = newer
+            // A check that failed says nothing either way, so an update found earlier stays on offer.
+            if (result.isSuccess) available = newer
             if (manual) {
                 snoozedTag = null
                 prefs.edit().remove(KEY_DISMISSED).apply()
                 when {
+                    result.isFailure -> note(
+                        (result.exceptionOrNull() as? Updater.Failure)?.message
+                            ?: "Couldn't check for updates. Check your internet connection and try again.",
+                        true,
+                    )
                     newer != null -> Unit // the card says it
-                    result.isFailure -> note("Couldn't check for updates. Check your internet connection and try again.", true)
                     else -> note("DocNest is up to date", false)
                 }
             }
