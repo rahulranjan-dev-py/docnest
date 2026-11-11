@@ -23,5 +23,7 @@ jobs:
         with:
           gradle-version: 8.14.3
 
+      # The release build too: it is the one that gets shrunk, so a shrinking error shows up here
+      # and not only when a release is made. Without the signing secrets it uses the debug key.
       - name: Build
-        run: gradle assembleDebug
+        run: gradle assembleDebug assembleRelease

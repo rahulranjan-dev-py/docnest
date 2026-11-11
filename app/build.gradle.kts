@@ -40,7 +40,10 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // Leaves out the code and resources DocNest never uses, for a smaller download.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             val canSign = releaseKey.exists() &&
                 !storePass.isNullOrEmpty() && !alias.isNullOrEmpty() && !keyPass.isNullOrEmpty()
             signingConfig = signingConfigs.getByName(if (canSign) "release" else "debug")
