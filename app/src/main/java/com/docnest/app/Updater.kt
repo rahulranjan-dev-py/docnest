@@ -50,12 +50,26 @@ object Updater {
         setRequestProperty("User-Agent", "DocNest")
     }
 
-    /** The newest release with an APK attached, or null when there is none. Call off the main thread. */
+    /**
+     * The newest release with an APK attached, or null when there is none. Throws when GitHub
+     * didn't answer the question, so "couldn't check" is never taken for "up to date".
+     * Call off the main thread.
+     */
     fun latest(): Release? {
         val conn = open(LATEST)
         conn.setRequestProperty("Accept", "application/vnd.github+json")
         try {
-            if (conn.responseCode != HttpURLConnection.HTTP_OK) return null
+            val code = conn.responseCode
+            when {
+                code == HttpURLConnection.HTTP_OK -> Unit
+                // GitHub's answer when no release has been published yet.
+                code == HttpURLConnection.HTTP_NOT_FOUND -> return null
+                // GitHub allows 60 checks an hour from one internet address, and phones on the
+                // same mobile or office network often share one.
+                code == 429 || conn.getHeaderField("X-RateLimit-Remaining") == "0" ->
+                    throw Failure("GitHub is limiting update checks on this network. Try again in an hour.")
+                else -> throw Failure("GitHub replied $code. Try again later.")
+            }
             val json = JSONObject(conn.inputStream.bufferedReader().use { it.readText() })
             val tag = json.getString("tag_name")
             val version = tag.substringAfterLast('.').toIntOrNull() ?: return null
