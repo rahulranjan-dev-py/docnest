@@ -75,6 +75,11 @@ class Settings(context: Context) {
         return (if (t.isNotEmpty()) "$t   |   " else "") + dateDots()
     }
 
+    /** Everything but the look, for the line above Save PDF: "Standard quality · A4 · Searchable". */
+    fun optionsLine(): String =
+        quality.label + " quality · " + (if (page == PageSize.A4) "A4" else "Photo size") +
+            (if (footerOn) " · Footer" else "") + (if (searchable) " · Searchable" else "")
+
     fun summary(): String =
         quality.label + " · " + colour.label + " · " +
             (if (page == PageSize.A4) "A4" else "Photo size") + (if (footerOn) " · Footer" else "") +

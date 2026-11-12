@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Behind the "Add pages" tile. -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/addScan"
+        android:title="Scan more pages" />
+    <item
+        android:id="@+id/addPhotos"
+        android:title="Add photos" />
+</menu>

@@ -37,7 +37,7 @@ import java.util.concurrent.Executors
 
 /**
  * Shoots photo after photo with no confirm screen in between.
- * Each shot is saved into the batch in the background while the next one is taken.
+ * Each shot is saved into the scan in the background while the next one is taken.
  */
 class CameraActivity : AppCompatActivity() {
 

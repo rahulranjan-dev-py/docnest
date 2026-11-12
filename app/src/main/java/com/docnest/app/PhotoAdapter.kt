@@ -12,18 +12,21 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 
 /**
- * The page cards: tap to view, rotate or delete below.
- * Reordering is by hold-and-drag, set up in MainActivity.
+ * The page cards (tap to view, rotate or delete below), followed by one "Add pages" tile.
+ * Reordering is by hold-and-drag, set up in ReviewActivity.
  */
 class PhotoAdapter(
     private val batch: Batch,
     private val listener: Listener,
-) : RecyclerView.Adapter<PhotoAdapter.Holder>() {
+) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     interface Listener {
         fun onView(i: Int)
         fun onRotate(i: Int)
         fun onRemove(i: Int)
+
+        /** The "Add pages" tile; [anchor] is where its menu opens. */
+        fun onAdd(anchor: View)
     }
 
     /** False while a PDF is being made or photos are being added. */
@@ -56,6 +59,7 @@ class PhotoAdapter(
             .also { thumbs.put(key(p), it) }
     }
 
+    /** A page card. */
     class Holder(v: View) : RecyclerView.ViewHolder(v) {
         val box: View = v.findViewById(R.id.thumbBox)
         val thumb: ImageView = v.findViewById(R.id.thumb)
@@ -65,13 +69,24 @@ class PhotoAdapter(
         val del: View = v.findViewById(R.id.delBtn)
     }
 
-    override fun getItemCount() = batch.items.size
+    /** The "Add pages" tile. */
+    class AddHolder(v: View) : RecyclerView.ViewHolder(v)
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
-        val h = Holder(LayoutInflater.from(parent.context).inflate(R.layout.item_photo, parent, false))
+    override fun getItemCount() = batch.items.size + 1
+
+    override fun getItemViewType(position: Int) = if (position < batch.items.size) PAGE else ADD
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
+        val inflater = LayoutInflater.from(parent.context)
+        if (viewType == ADD) {
+            val h = AddHolder(inflater.inflate(R.layout.item_add_pages, parent, false))
+            h.itemView.setOnClickListener { if (enabled) listener.onAdd(it) }
+            return h
+        }
+        val h = Holder(inflater.inflate(R.layout.item_photo, parent, false))
         fun click(v: View, action: (Int) -> Unit) = v.setOnClickListener {
             val i = h.bindingAdapterPosition
-            if (enabled && i != RecyclerView.NO_POSITION) action(i)
+            if (enabled && i != RecyclerView.NO_POSITION && i < batch.items.size) action(i)
         }
         click(h.box) { listener.onView(it) }
         click(h.rot) { listener.onRotate(it) }
@@ -79,7 +94,12 @@ class PhotoAdapter(
         return h
     }
 
-    override fun onBindViewHolder(h: Holder, position: Int) {
+    override fun onBindViewHolder(h: RecyclerView.ViewHolder, position: Int) {
+        if (h !is Holder) {
+            h.itemView.isEnabled = enabled
+            h.itemView.alpha = if (enabled) 1f else 0.38f
+            return
+        }
         val p = batch.items[position]
         val n = position + 1
         h.thumb.setImageBitmap(thumb(p))
@@ -91,5 +111,10 @@ class PhotoAdapter(
         for (v in listOf(h.box, h.rot, h.del)) v.isEnabled = enabled
         h.rot.alpha = if (enabled) 1f else 0.38f
         h.del.alpha = h.rot.alpha
+    }
+
+    private companion object {
+        const val PAGE = 0
+        const val ADD = 1
     }
 }

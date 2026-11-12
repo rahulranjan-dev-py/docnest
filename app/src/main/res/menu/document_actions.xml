@@ -7,6 +7,9 @@
         android:id="@+id/actionRename"
         android:title="Rename" />
     <item
+        android:id="@+id/actionSelect"
+        android:title="Select" />
+    <item
         android:id="@+id/actionDelete"
         android:title="Delete" />
 </menu>

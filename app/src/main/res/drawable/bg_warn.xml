@@ -2,6 +2,6 @@
 <!-- The "Blurry?" tag on a page card. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
-    <solid android:color="@color/error_container" />
+    <solid android:color="@color/warn_container" />
     <corners android:radius="100dp" />
 </shape>

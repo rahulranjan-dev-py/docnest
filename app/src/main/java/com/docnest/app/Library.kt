@@ -35,6 +35,9 @@ object Library {
 
     private val usesMediaStore get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
 
+    /** Where a saved PDF can be found, to finish a sentence: "3 pages, 1.2 MB, in …". */
+    val savedIn get() = if (usesMediaStore) "in Downloads and My documents" else "in My documents"
+
     private fun folder(context: Context) =
         (context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS) ?: File(context.filesDir, "Documents"))
             .apply { mkdirs() }

@@ -3,18 +3,20 @@
 A free, ad-free document scanner for Android. Photograph your pages and DocNest puts them together
 into a PDF.
 
+- **Your documents come first.** DocNest opens on **My documents**: every PDF it has made, newest
+  first, with a preview of page 1. Two buttons sit at the bottom: **Scan** and **Photos**.
 - **Fast camera.** Tap **Scan**, then the shutter (or a volume button) again and again: there is no
   ✓ / ✗ screen between shots. Tap **Done** when finished. A photo that looks out of focus is marked
   **Blurry?**, so you can retake it before it reaches a PDF.
-- **Crop to page edges** (a switch in settings, off by default). When on, **Scan** opens Google's
+- **Crop to page edges** (a switch in Settings, off by default). When on, **Scan** opens Google's
   page scanner instead: it finds each page, crops and straightens it, and lets you drag the corners.
   Off keeps the whole photo, which suits several articles in one shot.
-- **Add photos** from your gallery. They are sorted by the time they were taken, with a note if any
-  were taken before today.
-- **Check before you make the PDF.** Hold a page and drag it to reorder. Rotate or delete it (with
-  Undo). Tap a page to see it large.
-- **PDF settings** (the sliders button at the top). Quality, A4 or photo-size pages, an optional
-  footer with the date and page numbers, and how pages look:
+- **Photos** makes a PDF from pictures in your gallery. They are sorted by the time they were
+  taken, with a note if any were taken before today.
+- **Check before you save.** After scanning you see the pages on one screen, **New PDF**. Hold a
+  page and drag it to reorder. Rotate or delete it (with Undo). Tap a page to see it large. **Add
+  pages** scans more or adds photos.
+- **Choose the look** on that same screen:
   - **Original:** the photo as taken.
   - **Document:** like a scanner. Lighting is evened out, shadows and yellowed paper turn white,
     and text is sharpened.
@@ -22,28 +24,39 @@ into a PDF.
   - **B&W:** pure black text on white, judged spot by spot so faint print and shaded areas stay
     readable, with stray specks cleaned up. Pages are stored at 1 bit per pixel, so the PDF is much
     smaller. Best for pages of text; photos in the article turn into rough black-and-white patterns.
-- **Searchable text** (a switch in settings, off by default). DocNest reads the English text on
+- **PDF options.** One line above **Save PDF** shows the quality, the page size (A4 or photo size)
+  and whether there is a footer or searchable text. Tap **Change** to alter them.
+- **Searchable text** (a switch in Settings, off by default). DocNest reads the English text on
   each page and hides it behind the picture, so you can search and copy words in the PDF. Making
   the PDF takes longer. The text reader comes from Google Play services and downloads itself the
   first time.
-- **File names** are always `Scan_<date>.pdf`; a second PDF on the same day gets "(1)" added.
-- **Share anywhere.** After **Make PDF**, the file is saved in **Downloads** and the share screen
-  opens, so you can send it on WhatsApp, Gmail or any other app.
+- **File names** are always `Scan_<date>.pdf`; a second PDF on the same day gets "(1)" added. You
+  can rename a PDF in My documents.
+- **Save, then share.** **Save PDF** puts the file in **Downloads**. A sheet then offers **Share**
+  (WhatsApp, Gmail or any other app), **Open** and **Done**. Swipe the sheet away to stay with the
+  pages and save them again with another look.
+- **An unfinished scan waits for you.** Pages you scanned but haven't saved show as a card at the
+  top of My documents, with **Continue**. Once a scan is saved and you leave it, its pages are
+  cleared; the PDF stays. **Discard** throws a scan away.
 - **Long PDFs finish by themselves.** Making a PDF carries on if you switch to another app or lock
   the phone. A notification shows how far it is, with a **Cancel** button, and another tells you
   when the PDF is ready. Android 13 and newer ask once whether DocNest may show notifications; the
   PDF is made either way.
-- **My documents** (the folder button at the top). Every PDF DocNest has made, newest first, with a
-  preview of page 1. Tap one to open it, tap the star to keep it under **Favourites**, or use **⋮**
+- **My documents.** Tap a PDF to open it, tap the star to keep it under **Favourites**, or use **⋮**
   to share, rename or delete it. Deleting has an Undo. **Search** finds documents by name, and by the
   words inside searchable PDFs: type the start of one or more words, and it stays quick however many
   documents you have. These are the same files as in Downloads, so a rename or delete here
   changes the file there too.
+- **Delete several at once.** Hold a document (or choose **Select** under **⋮**), tap the others,
+  then tap the bin at the top. **Select all** picks everything in the list. DocNest asks before
+  deleting more than one, and the delete can still be undone for a few seconds.
+- **Settings** (the gear at the top of My documents): quality, page size, crop to page edges,
+  searchable text, the footer, and the app's version.
 - **Updates itself.** When a new version is out, a card appears at the top: **What's new**, **Later**,
   **Update**, or ✕ to skip that version. Every download is checked against the release's SHA-256
-  checksum before it can be installed. You can also tap **Check for updates** in the settings sheet.
-- **Private.** No account, no ads, no tracking. Pages stay on the phone until you tap **Clear**. The
-  only thing DocNest does online is check GitHub for updates.
+  checksum before it can be installed. You can also tap **Check for updates** in Settings.
+- **Private.** No account, no ads, no tracking. Your pages and PDFs stay on the phone. The only
+  thing DocNest does online is check GitHub for updates.
 
 ---
 
@@ -122,7 +135,7 @@ over the old ones.
    WhatsApp…): turn it on, go back, and tap **Install**.
 3. If Play Protect says the app is from an unknown developer, tap **More details → Install anyway**.
    This is normal for an app you built yourself.
-4. Open **DocNest** from the app drawer. The first time you tap **Camera**, allow the camera.
+4. Open **DocNest** from the app drawer. The first time you tap **Scan**, allow the camera.
 
 ## How to use
 
@@ -130,10 +143,10 @@ over the old ones.
    see on screen is exactly what goes into the PDF. Tap the screen to focus. The lightning button
    turns on the torch for dim rooms.
 2. Tap **Done**. Check the pages: hold and drag to reorder, rotate or delete. Tap a page to see it
-   large.
-3. Tap **Make PDF**. It is saved in Downloads and the share screen opens: choose WhatsApp, Gmail or
-   any other app. Tap **Share PDF** to send it again.
-4. When you are finished, tap **Clear** to start a new batch. Your PDF stays in **My documents**.
+   large. Choose the look at the top.
+3. Tap **Save PDF**. It is saved in Downloads, and a sheet slides up: tap **Share** and choose
+   WhatsApp, Gmail or any other app.
+4. Tap **Done**. You are back in **My documents**, with your new PDF at the top.
 
 ---
 
