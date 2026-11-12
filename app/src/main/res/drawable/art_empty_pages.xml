@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Empty batch: a small stack of pages, the front one with a manila index tab. -->
+<!-- No documents yet: a small stack of pages, the front one with a green tab. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="160dp"
     android:height="128dp"

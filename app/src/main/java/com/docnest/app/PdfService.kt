@@ -81,7 +81,7 @@ class PdfService : Service() {
     }
 
     private fun openApp(): PendingIntent = PendingIntent.getActivity(
-        this, 0, packageManager.getLaunchIntentForPackage(packageName) ?: Intent(this, MainActivity::class.java),
+        this, 0, packageManager.getLaunchIntentForPackage(packageName) ?: Intent(this, DocumentsActivity::class.java),
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
     )
 

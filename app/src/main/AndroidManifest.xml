@@ -25,16 +25,35 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.DocNest">
 
-        <!-- Turning the phone must not restart the screen, or photos being added would be lost. -->
+        <!-- Home: My documents. -->
         <activity
+            android:name=".DocumentsActivity"
+            android:exported="false" />
+
+        <!-- The launcher's entry. It keeps the name of the old first screen, so home-screen
+             shortcuts made before My documents became the first screen still work. -->
+        <activity-alias
             android:name=".MainActivity"
-            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
-            android:exported="true">
+            android:exported="true"
+            android:targetActivity=".DocumentsActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-        </activity>
+        </activity-alias>
+
+        <!-- A scan before it is saved. Turning the phone must not restart the screen, or photos
+             being added would be lost. -->
+        <activity
+            android:name=".ReviewActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
+            android:exported="false"
+            android:parentActivityName=".DocumentsActivity" />
+
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
 
         <!-- Locked to portrait; the shot's real orientation comes from the motion sensor. -->
         <activity
@@ -42,12 +61,6 @@
             android:exported="false"
             android:screenOrientation="portrait"
             android:theme="@style/Theme.DocNest.Camera" />
-
-        <activity
-            android:name=".DocumentsActivity"
-            android:exported="false"
-            android:label="My Documents"
-            android:parentActivityName=".MainActivity" />
 
         <!-- Runs while a PDF is being made (see PdfJob). -->
         <service

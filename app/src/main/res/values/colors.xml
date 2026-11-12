@@ -1,44 +1,48 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  DocNest palette: carbon-copy blue for actions, manila-folder yellow for page tabs and
-  selections, cool paper white for surfaces. Dark versions are in values-night.
+  DocNest palette: emerald green for actions, ink for text and selected filters, amber for
+  favourites, cool paper white for surfaces. Dark versions are in values-night.
 -->
 <resources>
-    <!-- Carbon-copy blue -->
-    <color name="primary">#3346A8</color>
+    <!-- Emerald -->
+    <color name="primary">#0A7453</color>
     <color name="on_primary">#FFFFFF</color>
-    <color name="primary_container">#DDE2FF</color>
-    <color name="on_primary_container">#0F1B5C</color>
-    <color name="primary_inverse">#B8C3FF</color>
+    <color name="primary_container">#DDF3E9</color>
+    <color name="on_primary_container">#064B35</color>
+    <color name="primary_inverse">#7FD6B2</color>
 
-    <!-- Manila folder -->
-    <color name="secondary">#7A5C12</color>
+    <!-- Amber: the favourites star. Its container is the same soft green as the primary's. -->
+    <color name="secondary">#B45309</color>
     <color name="on_secondary">#FFFFFF</color>
-    <color name="secondary_container">#F1E2B8</color>
-    <color name="on_secondary_container">#3D2E06</color>
+    <color name="secondary_container">#DDF3E9</color>
+    <color name="on_secondary_container">#064B35</color>
 
     <!-- Paper -->
-    <color name="background">#F6F7F9</color>
-    <color name="surface">#F6F7F9</color>
+    <color name="background">#F4F7F5</color>
+    <color name="surface">#F4F7F5</color>
     <color name="surface_lowest">#FFFFFF</color>
-    <color name="surface_low">#F0F2F6</color>
-    <color name="surface_mid">#EAEDF2</color>
-    <color name="surface_high">#E3E7ED</color>
-    <color name="surface_highest">#DCE1E8</color>
-    <color name="surface_inverse">#2B303B</color>
-    <color name="on_surface_inverse">#EEF0F5</color>
-    <color name="on_surface">#161B26</color>
-    <color name="on_surface_variant">#4D5566</color>
-    <color name="outline">#8A93A3</color>
-    <color name="outline_variant">#D3D8E0</color>
+    <color name="surface_low">#EEF2EF</color>
+    <color name="surface_mid">#E8EDEA</color>
+    <color name="surface_high">#E2E8E4</color>
+    <color name="surface_highest">#DCE3DF</color>
+    <color name="surface_inverse">#2A322E</color>
+    <color name="on_surface_inverse">#EDF2EF</color>
+    <color name="on_surface">#0F1A15</color>
+    <color name="on_surface_variant">#4F5D56</color>
+    <color name="outline">#7D8A84</color>
+    <color name="outline_variant">#D3DBD6</color>
 
     <color name="error">#B3261E</color>
     <color name="on_error">#FFFFFF</color>
     <color name="error_container">#F9DEDC</color>
     <color name="on_error_container">#410E0B</color>
 
+    <!-- The "Blurry?" tag -->
+    <color name="warn_container">#FDE7C7</color>
+    <color name="on_warn_container">#6B3A05</color>
+
     <!-- Behind a page thumbnail, so white paper still shows its edges -->
-    <color name="page_well">#DCE1E8</color>
-    <color name="icon_bg">#3346A8</color>
+    <color name="page_well">#E6ECE8</color>
+    <color name="icon_bg">#0A7453</color>
     <bool name="light_bars">true</bool>
 </resources>

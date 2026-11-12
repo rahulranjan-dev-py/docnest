@@ -86,7 +86,7 @@
         android:paddingTop="6dp"
         android:paddingEnd="14dp"
         android:paddingBottom="6dp"
-        android:text="Fit the page in the frame, then tap the button"
+        android:text="Fit the page in the frame. Tap the screen to focus."
         android:textAppearance="?attr/textAppearanceBodyMedium"
         android:textColor="#FFFFFF" />
 

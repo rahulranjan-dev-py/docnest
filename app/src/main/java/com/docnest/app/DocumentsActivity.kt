@@ -2,7 +2,6 @@ package com.docnest.app
 
 import android.content.ActivityNotFoundException
 import android.content.DialogInterface
-import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import android.view.WindowManager
@@ -10,6 +9,8 @@ import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import android.widget.PopupMenu
 import android.widget.TextView
+import androidx.activity.OnBackPressedCallback
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
 import androidx.core.widget.doAfterTextChanged
@@ -26,19 +27,27 @@ import com.google.android.material.snackbar.Snackbar
 import com.google.android.material.textfield.TextInputLayout
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 
 /**
- * "My documents": every PDF DocNest has made. Tap to open; star to favourite; ⋮ to share, rename
- * or delete. Deleting is undoable: the row disappears at once, and the file goes when the Undo
- * note does (or when this screen closes).
+ * Home: every PDF DocNest has made, with Scan and Photos along the bottom.
+ *
+ * Tap a document to open it; star to favourite; ⋮ to share, rename, select or delete. Hold a
+ * document to start selecting several, then delete them together. Deleting is undoable: the rows
+ * disappear at once, and the files go when the Undo note does (or when this screen is left).
+ *
+ * A scan that isn't saved yet, or a PDF being made, shows as a card above the list.
+ * The launcher opens this screen under its old name, .MainActivity (see the manifest).
  */
 class DocumentsActivity : AppCompatActivity(), DocumentAdapter.Listener {
 
+    private lateinit var batch: Batch
     private lateinit var root: View
+    private lateinit var normalBar: View
+    private lateinit var selectBar: View
+    private lateinit var selCount: TextView
     private lateinit var loading: View
     private lateinit var empty: View
     private lateinit var emptyTitle: TextView
@@ -46,9 +55,16 @@ class DocumentsActivity : AppCompatActivity(), DocumentAdapter.Listener {
     private lateinit var emptyAction: MaterialButton
     private lateinit var chipAll: Chip
     private lateinit var chipFavourites: Chip
+    private lateinit var draftCard: View
+    private lateinit var draftTitle: TextView
+    private lateinit var draftText: TextView
+    private lateinit var draftBtn: MaterialButton
+    private lateinit var bottomBar: View
     private lateinit var adapter: DocumentAdapter
+    private lateinit var updateBanner: UpdateBanner
 
     private var all: List<Doc> = emptyList()
+    private var shown: List<Doc> = emptyList() // what the list shows now, after the filter and search
     private var typed = "" // what is in the search box
     private var query = "" // the search on screen: [typed], once [textMatches] has caught up with it
     private var textMatches: Set<String> = emptySet() // keys of documents whose text has [query]
@@ -56,13 +72,35 @@ class DocumentsActivity : AppCompatActivity(), DocumentAdapter.Listener {
     private var loaded = false
     private var loadFailed = false
     private var onlyFavourites = false
+    private val selected = LinkedHashSet<String>() // keys; not empty means documents are being selected
     private val pendingDeletes = mutableMapOf<String, Doc>()
     private var undoBar: Snackbar? = null
+
+    // An update waiting for the "install unknown apps" permission.
+    private var pendingInstall: File? = null
+
+    private val askInstallPermission = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        val apk = pendingInstall
+        if (apk != null && Updater.canInstall(this)) install(apk)
+    }
+
+    private val openSettings = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        if (r.resultCode == SettingsActivity.RESULT_CHECK_UPDATES) updateBanner.check(manual = true)
+    }
+
+    // Back leaves selecting before it leaves the app.
+    private val stopSelecting = object : OnBackPressedCallback(false) {
+        override fun handleOnBackPressed() = clearSelection()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_documents)
+        batch = Batch.get(this)
         root = findViewById(R.id.root)
+        normalBar = findViewById(R.id.normalBar)
+        selectBar = findViewById(R.id.selectBar)
+        selCount = findViewById(R.id.selCount)
         loading = findViewById(R.id.loading)
         empty = findViewById(R.id.empty)
         emptyTitle = findViewById(R.id.emptyTitle)
@@ -70,8 +108,19 @@ class DocumentsActivity : AppCompatActivity(), DocumentAdapter.Listener {
         emptyAction = findViewById(R.id.emptyAction)
         chipAll = findViewById(R.id.chipAll)
         chipFavourites = findViewById(R.id.chipFavourites)
+        draftCard = findViewById(R.id.draftCard)
+        draftTitle = findViewById(R.id.draftTitle)
+        draftText = findViewById(R.id.draftText)
+        draftBtn = findViewById(R.id.draftBtn)
+        bottomBar = findViewById(R.id.bottomBar)
 
-        findViewById<View>(R.id.backBtn).setOnClickListener { finish() }
+        findViewById<View>(R.id.settingsBtn).setOnClickListener { openSettings.launch(SettingsActivity.intent(this)) }
+        findViewById<View>(R.id.closeSelBtn).setOnClickListener { clearSelection() }
+        findViewById<View>(R.id.selectAllBtn).setOnClickListener {
+            selected += shown.map { it.key }
+            render()
+        }
+        findViewById<View>(R.id.deleteSelBtn).setOnClickListener { deleteSelected() }
         findViewById<EditText>(R.id.searchIn).doAfterTextChanged {
             typed = it?.toString()?.trim()?.lowercase().orEmpty()
             search()
@@ -80,24 +129,90 @@ class DocumentsActivity : AppCompatActivity(), DocumentAdapter.Listener {
             onlyFavourites = R.id.chipFavourites in ids
             render()
         }
+        draftCard.setOnClickListener { openScan(null) }
+        draftBtn.setOnClickListener { openScan(null) }
+        findViewById<View>(R.id.scanBtn).setOnClickListener { openScan(ReviewActivity.START_SCAN) }
+        findViewById<View>(R.id.photosBtn).setOnClickListener { openScan(ReviewActivity.START_PHOTOS) }
+
         adapter = DocumentAdapter(lifecycleScope, this, this)
         val list = findViewById<RecyclerView>(R.id.list)
         list.layoutManager = LinearLayoutManager(this)
         list.adapter = adapter
+        onBackPressedDispatcher.addCallback(this, stopSelecting)
 
-        // Reloaded every time the screen comes back, so files renamed or deleted in another app show
-        // correctly, and again when a PDF being made in the background is finished.
-        lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                PdfJob.state.map { it as? PdfJob.Done }.distinctUntilChanged().collect { load() }
-            }
-        }
+        updateBanner = UpdateBanner(this, findViewById(R.id.updateBanner), ::install) { text, long -> note(text, long) }
+        lifecycleScope.launch { repeatOnLifecycle(Lifecycle.State.STARTED) { followPdf() } }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        updateBanner.onAppOpened()
     }
 
     override fun onStop() {
         commitAllDeletes()
         undoBar?.dismiss()
         super.onStop()
+    }
+
+    /** Opens the scan in progress; [start] also starts the camera or the photo picker there. */
+    private fun openScan(start: String?) {
+        // While a PDF is being made its pages mustn't change: show how far it is instead.
+        startActivity(ReviewActivity.intent(this, start.takeUnless { PdfJob.running }))
+    }
+
+    // ---------- the scan in progress, and the PDF being made ----------
+
+    /**
+     * Runs whenever this screen is showing. Keeps the card above the list in step with the PDF
+     * being made, says how a PDF ended if its own screen wasn't there to say it, and reloads the
+     * list: every time the screen comes back (files may have been renamed or deleted in another
+     * app) and again when a PDF is finished.
+     */
+    private suspend fun followPdf() {
+        var listed: PdfJob.State? = null // the state the list was last loaded for
+        PdfJob.state.collect { s ->
+            when (s) {
+                is PdfJob.Done -> if (!s.seen) {
+                    s.seen = true
+                    PdfService.clearResult(this)
+                    val saved = s.saved
+                    if (saved == null) {
+                        note("The PDF was made, but couldn't be saved. Open the scan and tap Share PDF.", long = true)
+                    } else {
+                        note("Saved ${saved.name} (${fmtBytes(s.file.length())})", long = true, action = "Share" to { share(saved) })
+                    }
+                }
+                PdfJob.Failed -> {
+                    PdfJob.reset()
+                    PdfService.clearResult(this)
+                    note("Couldn't make the PDF. Open the scan to try again.", long = true)
+                }
+                else -> Unit
+            }
+            // Pages that are in a saved PDF, unchanged, are a finished scan.
+            if (s !is PdfJob.Running) batch.clearIfSaved()
+            showDraft()
+            if (listed == null || (s is PdfJob.Done && s !== listed)) {
+                listed = s
+                load()
+            }
+        }
+    }
+
+    private fun showDraft() {
+        val s = PdfJob.state.value
+        val n = batch.items.size
+        draftCard.isVisible = selected.isEmpty() && (s is PdfJob.Running || n > 0)
+        if (s is PdfJob.Running) {
+            draftTitle.text = "Making your PDF"
+            draftText.text = s.text
+            draftBtn.text = "View"
+        } else {
+            draftTitle.text = "Unfinished scan"
+            draftText.text = "${pages(n)}, not saved yet"
+            draftBtn.text = "Continue"
+        }
     }
 
     // ---------- loading and showing ----------
@@ -138,14 +253,24 @@ class DocumentsActivity : AppCompatActivity(), DocumentAdapter.Listener {
         val favs = Library.favourites(this)
         val present = all.filter { it.key !in pendingDeletes }
         val starred = present.filter { it.key in favs }
-        chipAll.text = "All (${present.size})"
-        chipFavourites.text = "Favourites (${starred.size})"
+        chipAll.text = "All ${present.size}"
+        chipFavourites.text = "Favourites ${starred.size}"
         val filtered = if (onlyFavourites) starred else present
         // Search looks at names, and inside PDFs that were made searchable.
-        val shown = if (query.isEmpty()) filtered else filtered.filter { d ->
+        shown = if (query.isEmpty()) filtered else filtered.filter { d ->
             d.name.lowercase().contains(query) || d.key in textMatches
         }
-        adapter.submit(shown, favs)
+        // A document that is gone (deleted here or in another app) can't stay selected.
+        selected.retainAll(present.map { it.key }.toSet())
+        adapter.submit(shown, favs, selected.toSet())
+
+        val selecting = selected.isNotEmpty()
+        normalBar.isVisible = !selecting
+        selectBar.isVisible = selecting
+        selCount.text = "${selected.size} selected"
+        bottomBar.isVisible = !selecting
+        stopSelecting.isEnabled = selecting
+        showDraft()
 
         empty.isVisible = loaded && shown.isEmpty()
         when {
@@ -166,24 +291,26 @@ class DocumentsActivity : AppCompatActivity(), DocumentAdapter.Listener {
             ) { chipAll.isChecked = true }
             else -> showEmpty(
                 "No documents yet",
-                "PDFs you make in DocNest appear here.",
-                "Scan pages",
-            ) {
-                startActivity(Intent(this, CameraActivity::class.java))
-                finish()
-            }
+                "Tap Scan to photograph your pages, or Photos to use pictures you already have.",
+                null,
+            ) {}
         }
     }
 
-    private fun showEmpty(title: String, body: String, action: String, onAction: () -> Unit) {
+    private fun showEmpty(title: String, body: String, action: String?, onAction: () -> Unit) {
         emptyTitle.text = title
         emptyBody.text = body
+        emptyAction.isVisible = action != null
         emptyAction.text = action
         emptyAction.setOnClickListener { onAction() }
     }
 
-    private fun note(text: String, long: Boolean = false) {
-        Snackbar.make(root, text, if (long) Snackbar.LENGTH_LONG else Snackbar.LENGTH_SHORT).show()
+    /** A short note above the bottom bar, gone after a few seconds, with an optional button. */
+    private fun note(text: String, long: Boolean = false, action: Pair<String, () -> Unit>? = null) {
+        val bar = Snackbar.make(root, text, if (long) Snackbar.LENGTH_LONG else Snackbar.LENGTH_SHORT)
+        if (bottomBar.isVisible) bar.setAnchorView(bottomBar)
+        if (action != null) bar.setAction(action.first) { action.second() }
+        bar.show()
     }
 
     // ---------- row actions ----------
@@ -201,12 +328,10 @@ class DocumentsActivity : AppCompatActivity(), DocumentAdapter.Listener {
         render()
         // Un-starring in the Favourites view makes the row vanish, so offer a way back.
         if (!on && onlyFavourites) {
-            Snackbar.make(root, "Removed from favourites", Snackbar.LENGTH_LONG)
-                .setAction("Undo") {
-                    Library.setFavourite(this, doc.key, true)
-                    render()
-                }
-                .show()
+            note("Removed from favourites", long = true, action = "Undo" to {
+                Library.setFavourite(this, doc.key, true)
+                render()
+            })
         }
     }
 
@@ -217,7 +342,8 @@ class DocumentsActivity : AppCompatActivity(), DocumentAdapter.Listener {
                 when (item.itemId) {
                     R.id.actionShare -> share(doc)
                     R.id.actionRename -> askRename(doc)
-                    R.id.actionDelete -> delete(doc)
+                    R.id.actionSelect -> onSelect(doc)
+                    R.id.actionDelete -> delete(listOf(doc))
                 }
                 true
             }
@@ -231,6 +357,33 @@ class DocumentsActivity : AppCompatActivity(), DocumentAdapter.Listener {
         } catch (e: ActivityNotFoundException) {
             note("No app on this phone can share PDFs.", long = true)
         }
+    }
+
+    // ---------- selecting several ----------
+
+    override fun onSelect(doc: Doc) {
+        if (!selected.remove(doc.key)) selected += doc.key
+        render()
+    }
+
+    private fun clearSelection() {
+        selected.clear()
+        render()
+    }
+
+    /** One document goes at once, with Undo. Several are confirmed first, and can still be undone. */
+    private fun deleteSelected() {
+        val docs = all.filter { it.key in selected }
+        if (docs.size <= 1) {
+            delete(docs)
+            return
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Delete ${docs.size} Documents?")
+            .setMessage("They are deleted from this phone, not only from DocNest.")
+            .setPositiveButton("Delete") { _, _ -> delete(docs) }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     // ---------- rename ----------
@@ -297,30 +450,42 @@ class DocumentsActivity : AppCompatActivity(), DocumentAdapter.Listener {
 
     // ---------- delete, with Undo ----------
 
-    private fun delete(doc: Doc) {
-        pendingDeletes[doc.key] = doc
+    private fun delete(docs: List<Doc>) {
+        if (docs.isEmpty()) return
+        docs.forEach { pendingDeletes[it.key] = it }
+        selected.clear()
         render()
-        undoBar = Snackbar.make(root, "Deleted ${doc.name}", Snackbar.LENGTH_LONG)
+        val keys = docs.map { it.key }
+        val text = if (docs.size == 1) "Deleted ${docs[0].name}" else "Deleted ${docs.size} documents"
+        undoBar = Snackbar.make(root, text, Snackbar.LENGTH_LONG)
+            .setAnchorView(bottomBar)
             .setAction("Undo") {
-                pendingDeletes.remove(doc.key)
+                keys.forEach { pendingDeletes.remove(it) }
                 render()
             }
             .addCallback(object : Snackbar.Callback() {
                 override fun onDismissed(transientBottomBar: Snackbar?, event: Int) {
-                    if (event != Snackbar.Callback.DISMISS_EVENT_ACTION) commitDelete(doc.key)
+                    if (event != Snackbar.Callback.DISMISS_EVENT_ACTION) commitDeletes(keys)
                 }
             })
             .also { it.show() }
     }
 
-    private fun commitDelete(key: String) {
-        val doc = pendingDeletes.remove(key) ?: return
+    private fun commitDeletes(keys: List<String>) {
+        val docs = keys.mapNotNull { pendingDeletes.remove(it) }
+        if (docs.isEmpty()) return
         lifecycleScope.launch {
-            val result = withContext(Dispatchers.IO) { runCatching { Library.delete(this@DocumentsActivity, doc) } }
-            if (result.isSuccess) {
-                all = all.filter { it.key != key }
-            } else {
-                note((result.exceptionOrNull() as? Library.Failure)?.message ?: "Couldn't delete ${doc.name}.", long = true)
+            val failed = withContext(Dispatchers.IO) {
+                docs.mapNotNull { d -> runCatching { Library.delete(this@DocumentsActivity, d) }.exceptionOrNull()?.let { d to it } }
+            }
+            val kept = failed.map { it.first.key }.toSet()
+            all = all.filter { d -> d.key in kept || docs.none { it.key == d.key } }
+            when {
+                failed.size == 1 -> {
+                    val (doc, why) = failed[0]
+                    note((why as? Library.Failure)?.message ?: "Couldn't delete ${doc.name}.", long = true)
+                }
+                failed.size > 1 -> note("${failed.size} documents couldn't be deleted. Delete them in your Files app.", long = true)
             }
             render()
         }
@@ -334,5 +499,22 @@ class DocumentsActivity : AppCompatActivity(), DocumentAdapter.Listener {
         val app = applicationContext
         all = all.filter { d -> docs.none { it.key == d.key } }
         Thread { docs.forEach { runCatching { Library.delete(app, it) } } }.start()
+    }
+
+    // ---------- updates (checking and downloading live in UpdateBanner) ----------
+
+    private fun install(apk: File) {
+        if (!Updater.canInstall(this)) {
+            pendingInstall = apk
+            MaterialAlertDialogBuilder(this)
+                .setTitle("Allow Updates")
+                .setMessage("To install updates, turn on “Allow from this source” for DocNest, then come back.")
+                .setPositiveButton("Open settings") { _, _ -> askInstallPermission.launch(Updater.permissionIntent(this)) }
+                .setNegativeButton("Cancel", null)
+                .show()
+            return
+        }
+        pendingInstall = null
+        startActivity(Updater.installIntent(this, apk))
     }
 }

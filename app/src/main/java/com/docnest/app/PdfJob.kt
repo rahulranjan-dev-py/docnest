@@ -29,9 +29,13 @@ object PdfJob {
     /** One page for the PDF: a stored photo and how far it is turned. */
     class Page(val photo: File, val rot: Int)
 
-    /** Everything a PDF is made from, copied when Make PDF is tapped. [key]: see [Done.key]. */
+    /**
+     * Everything a PDF is made from, copied when Save PDF is tapped. [key]: see [Done.key].
+     * [pagesKey] is [Batch.pagesKey] at that moment, so the scan can be marked as saved.
+     */
     class Request(
         val pages: List<Page>,
+        val pagesKey: String,
         val quality: Quality,
         val colour: ColourMode,
         val page: PageSize,
@@ -52,13 +56,13 @@ object PdfJob {
      * shared again without rebuilding. [saved] is null when it couldn't be filed in My documents.
      * [textMissing]: it was meant to be searchable, but no page could be read.
      */
-    class Done(val file: File, val key: String, val saved: Doc?, val textMissing: Boolean) : State {
-        /** Set once the main screen has told the user. */
+    class Done(val file: File, val key: String, val saved: Doc?, val pages: Int, val textMissing: Boolean) : State {
+        /** Set once a screen has told the user. */
         @Volatile
         var seen = false
     }
 
-    /** Stays until the main screen has told the user, then [reset]. */
+    /** Stays until a screen has told the user, then [reset]. */
     data object Failed : State
 
     private val _state = MutableStateFlow<State>(Idle)
@@ -135,7 +139,8 @@ object PdfJob {
             currentCoroutineContext().ensureActive()
             _state.value = Running("Saving to My documents…", 1f)
             val saved = runCatching { Library.save(context, file, allText.toString().takeIf { it.isNotBlank() }) }.getOrNull()
-            _state.value = Done(file, r.key, saved, textMissing = r.searchable && unread == n)
+            if (saved != null) Batch.get(context).markSaved(r.pagesKey)
+            _state.value = Done(file, r.key, saved, n, textMissing = r.searchable && unread == n)
         } catch (e: CancellationException) {
             dir.deleteRecursively()
             _state.value = Idle

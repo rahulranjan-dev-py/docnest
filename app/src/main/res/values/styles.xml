@@ -1,25 +1,43 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- The app name: condensed and heavy, like a label on a folder. -->
+    <!-- The app name at the top of the home screen. -->
     <style name="TextAppearance.DocNest.Brand" parent="TextAppearance.Material3.HeadlineSmall">
-        <item name="fontFamily">sans-serif-condensed</item>
-        <item name="android:fontFamily">sans-serif-condensed</item>
         <item name="android:textStyle">bold</item>
-        <item name="android:textSize">28sp</item>
+        <item name="android:textSize">26sp</item>
         <item name="android:letterSpacing">-0.01</item>
         <item name="android:textColor">?attr/colorOnSurface</item>
     </style>
 
-    <!-- Page numbers on the manila tabs. -->
+    <!-- The page number in the round badge on each page. -->
     <style name="TextAppearance.DocNest.Tab" parent="TextAppearance.Material3.LabelLarge">
-        <item name="fontFamily">sans-serif-condensed</item>
-        <item name="android:fontFamily">sans-serif-condensed</item>
         <item name="android:textStyle">bold</item>
         <item name="android:textSize">14sp</item>
-        <item name="android:textColor">?attr/colorOnSecondaryContainer</item>
+        <item name="android:textColor">@color/surface_lowest</item>
     </style>
 
-    <!-- The two big buttons at the bottom of the main screen. -->
+    <!-- The small green heading over a group of settings. -->
+    <style name="TextAppearance.DocNest.Section" parent="TextAppearance.Material3.LabelLarge">
+        <item name="android:textStyle">bold</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:textColor">?attr/colorPrimary</item>
+    </style>
+
+    <!-- All / Favourites: the chosen one turns ink-dark. -->
+    <style name="Widget.DocNest.FilterChip" parent="Widget.Material3.Chip.Filter">
+        <item name="chipBackgroundColor">@color/chip_bg</item>
+        <item name="chipStrokeColor">@color/chip_stroke</item>
+        <item name="android:textColor">@color/chip_text</item>
+        <item name="checkedIconVisible">false</item>
+        <item name="chipMinHeight">36dp</item>
+        <item name="shapeAppearanceOverlay">@style/ShapeAppearance.DocNest.Pill</item>
+    </style>
+
+    <style name="ShapeAppearance.DocNest.Pill" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">50%</item>
+    </style>
+
+    <!-- The big buttons along the bottom of a screen. -->
     <!-- One line only, so large system text shortens a label instead of wrapping it. -->
     <style name="Widget.DocNest.DockButton" parent="Widget.Material3.Button">
         <item name="android:layout_height">56dp</item>
@@ -30,11 +48,12 @@
         <item name="android:textSize">16sp</item>
         <item name="android:maxLines">1</item>
         <item name="android:ellipsize">end</item>
-        <item name="cornerRadius">16dp</item>
+        <item name="cornerRadius">18dp</item>
         <item name="iconGravity">textStart</item>
     </style>
 
-    <style name="Widget.DocNest.DockButton.Tonal" parent="Widget.Material3.Button.TonalButton">
+    <!-- The quieter button beside a main one: white with an outline. -->
+    <style name="Widget.DocNest.DockButton.Outlined" parent="Widget.Material3.Button.OutlinedButton">
         <item name="android:layout_height">56dp</item>
         <item name="android:insetTop">0dp</item>
         <item name="android:insetBottom">0dp</item>
@@ -43,11 +62,15 @@
         <item name="android:textSize">16sp</item>
         <item name="android:maxLines">1</item>
         <item name="android:ellipsize">end</item>
-        <item name="cornerRadius">16dp</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
+        <item name="iconTint">?attr/colorOnSurface</item>
+        <item name="backgroundTint">@color/surface_lowest</item>
+        <item name="strokeColor">?attr/colorOutline</item>
+        <item name="cornerRadius">18dp</item>
         <item name="iconGravity">textStart</item>
     </style>
 
-    <!-- One choice in a settings row; the selected one turns manila. -->
+    <!-- One choice in a row of choices; the selected one turns green. -->
     <style name="Widget.DocNest.Segment" parent="Widget.Material3.Button.OutlinedButton">
         <item name="android:layout_width">0dp</item>
         <item name="android:layout_height">48dp</item>
@@ -60,6 +83,7 @@
         <item name="android:ellipsize">end</item>
         <item name="android:textSize">14sp</item>
         <item name="android:textColor">@color/segment_text</item>
+        <item name="backgroundTint">@color/segment_bg</item>
         <item name="strokeColor">?attr/colorOutline</item>
     </style>
 

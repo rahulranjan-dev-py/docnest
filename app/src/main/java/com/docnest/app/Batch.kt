@@ -1,6 +1,7 @@
 package com.docnest.app
 
 import android.content.Context
+import androidx.core.content.edit
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -9,12 +10,14 @@ import java.io.File
 class Photo(val id: String, var rot: Int = 0, var blurry: Boolean = false)
 
 /**
- * Today's photos, in PDF order. They stay on the phone until the batch is cleared.
+ * The scan in progress: its photos, in PDF order. They stay on the phone until the scan is saved
+ * as a PDF and left, or discarded.
  * One shared instance; change [items] on the main thread only, then call [save].
  */
 class Batch private constructor(context: Context) {
     private val dir = File(context.filesDir, "photos").apply { mkdirs() }
     private val index = File(context.filesDir, "batch.json")
+    private val prefs = context.getSharedPreferences("batch", Context.MODE_PRIVATE)
     val items = mutableListOf<Photo>()
 
     fun photoFile(p: Photo) = File(dir, "${p.id}.jpg")
@@ -43,6 +46,24 @@ class Batch private constructor(context: Context) {
         items.clear()
         dir.listFiles()?.forEach { it.delete() }
         save()
+        prefs.edit { remove(KEY_SAVED) }
+    }
+
+    /** Which pages, and which way up each is: what a PDF is made from. */
+    fun pagesKey(): String = items.joinToString(",") { "${it.id}:${it.rot}" }
+
+    /** Remembers that the pages in [key] are now in a saved PDF. Safe from any thread. */
+    fun markSaved(key: String) = prefs.edit { putString(KEY_SAVED, key) }
+
+    /**
+     * A scan whose pages haven't changed since they were saved as a PDF is finished: this clears
+     * it and says so. Home calls it, so the pages are still there for another go (a different
+     * look, say) for as long as the scan's own screen stays open.
+     */
+    fun clearIfSaved(): Boolean {
+        if (items.isEmpty() || prefs.getString(KEY_SAVED, null) != pagesKey()) return false
+        clear()
+        return true
     }
 
     private fun load() {
@@ -60,6 +81,8 @@ class Batch private constructor(context: Context) {
     }
 
     companion object {
+        private const val KEY_SAVED = "savedPages"
+
         @Volatile
         private var instance: Batch? = null
 

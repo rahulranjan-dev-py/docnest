@@ -38,7 +38,7 @@
         <item name="android:windowBackground">@color/background</item>
         <item name="android:statusBarColor">@color/background</item>
         <item name="android:windowLightStatusBar">@bool/light_bars</item>
-        <item name="android:navigationBarColor">@color/surface_mid</item>
+        <item name="android:navigationBarColor">@color/surface_lowest</item>
         <item name="bottomSheetDialogTheme">@style/ThemeOverlay.DocNest.BottomSheet</item>
     </style>
 
@@ -56,13 +56,13 @@
 
     <!-- Camera and photo viewer: always dark, whatever the phone's theme. -->
     <style name="Theme.DocNest.Dark" parent="Theme.Material3.Dark.NoActionBar">
-        <item name="colorPrimary">#B8C3FF</item>
-        <item name="colorOnPrimary">#142272</item>
-        <item name="colorSecondaryContainer">#30353F</item>
-        <item name="colorOnSecondaryContainer">#E3E6ED</item>
+        <item name="colorPrimary">#0A7453</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorSecondaryContainer">#303733</item>
+        <item name="colorOnSecondaryContainer">#DEE4E0</item>
         <item name="colorSurface">#000000</item>
-        <item name="colorOnSurface">#E3E6ED</item>
-        <item name="colorOnSurfaceVariant">#A9B0BE</item>
+        <item name="colorOnSurface">#DEE4E0</item>
+        <item name="colorOnSurfaceVariant">#A7B3AD</item>
         <item name="colorError">#F2B8B5</item>
         <item name="android:windowBackground">#000000</item>
         <item name="android:statusBarColor">#000000</item>

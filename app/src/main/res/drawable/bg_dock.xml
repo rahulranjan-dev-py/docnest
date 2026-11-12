@@ -1,8 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<shape xmlns:android="http://schemas.android.com/apk/res/android"
-    android:shape="rectangle">
-    <solid android:color="@color/surface_mid" />
-    <corners
-        android:topLeftRadius="24dp"
-        android:topRightRadius="24dp" />
-</shape>
+<!-- The bar along the bottom of a screen: white, with a hairline along its top. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/outline_variant" />
+        </shape>
+    </item>
+    <item android:top="1dp">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/surface_lowest" />
+        </shape>
+    </item>
+</layer-list>

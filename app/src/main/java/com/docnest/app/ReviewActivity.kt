@@ -2,22 +2,24 @@ package com.docnest.app
 
 import android.Manifest
 import android.app.Dialog
+import android.content.ActivityNotFoundException
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.content.res.ColorStateList
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.view.View
-import android.widget.EditText
 import android.widget.ImageView
+import android.widget.PopupMenu
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
-import androidx.core.graphics.ColorUtils
+import androidx.core.view.children
 import androidx.core.view.isVisible
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -29,10 +31,7 @@ import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.button.MaterialButtonToggleGroup
-import com.google.android.material.chip.ChipGroup
-import com.google.android.material.color.MaterialColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import com.google.android.material.materialswitch.MaterialSwitch
 import com.google.android.material.progressindicator.LinearProgressIndicator
 import com.google.android.material.snackbar.Snackbar
 import com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions
@@ -48,72 +47,88 @@ import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
-import androidx.appcompat.R as AppCompatR
-import com.google.android.material.R as MaterialR
 
-class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
+/**
+ * A scan before it is saved ("New PDF"): choose the look, check the pages (drag to reorder,
+ * rotate, delete, add more), then Save PDF. When the PDF is made a sheet offers Share, Open and
+ * Done. The pages stay for as long as this screen does, so the PDF can be made again with
+ * another look; once the screen is left, a saved scan is finished (see [Batch.clearIfSaved]).
+ */
+class ReviewActivity : AppCompatActivity(), PhotoAdapter.Listener {
+
+    companion object {
+        /** Open the camera (or the page scanner) straight away. */
+        const val START_SCAN = "scan"
+
+        /** Open the photo picker straight away. */
+        const val START_PHOTOS = "photos"
+        private const val EXTRA_START = "start"
+
+        fun intent(context: Context, start: String? = null): Intent =
+            Intent(context, ReviewActivity::class.java).putExtra(EXTRA_START, start)
+    }
 
     private lateinit var batch: Batch
     private lateinit var settings: Settings
     private lateinit var adapter: PhotoAdapter
     private lateinit var root: View
     private lateinit var dock: View
-    private lateinit var listHeader: View
     private lateinit var countText: TextView
-    private lateinit var emptyView: View
+    private lateinit var lookGroup: MaterialButtonToggleGroup
+    private lateinit var lookHint: TextView
     private lateinit var statusRow: View
     private lateinit var statusText: TextView
     private lateinit var progress: LinearProgressIndicator
+    private lateinit var optionsRow: View
+    private lateinit var optionsText: TextView
+    private lateinit var changeBtn: View
     private lateinit var makeBtn: MaterialButton
-    private lateinit var cameraBtn: MaterialButton
-    private lateinit var galleryBtn: MaterialButton
-    private lateinit var settingsBtn: View
-    private lateinit var clearBtn: View
+    private lateinit var discardBtn: View
     private lateinit var cancelBtn: View
-    private lateinit var updateBanner: UpdateBanner
-    private var adding = false // photos are being added to the batch
+    private var savedSheet: BottomSheetDialog? = null
+    private var adding = false // photos are being added to the scan
 
     // The PDF is made by PdfJob, outside this screen, so it carries on when the screen is left.
     private val making get() = PdfJob.running
     private val busy get() = adding || making
 
-    /** The last PDF made. Tapping the button again shares it without rebuilding, until something changes. */
+    /** The last PDF made. Tapping the button again offers it without rebuilding, until something changes. */
     private val built get() = PdfJob.state.value as? PdfJob.Done
 
     private val pickPhotos = registerForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
-        if (uris.isNotEmpty()) addFromGallery(uris)
+        if (uris.isNotEmpty()) addFromGallery(uris) else leaveIfEmpty()
     }
 
     // "Crop to page edges": Google's scanner finds, crops and straightens each page, and lets the
-    // user drag the corners. Its pages then join the batch like photos, in the order scanned.
+    // user drag the corners. Its pages then join the scan like photos, in the order scanned.
     private val pageScanner = registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { r ->
-        if (r.resultCode != RESULT_OK) return@registerForActivityResult
-        val uris = GmsDocumentScanningResult.fromActivityResultIntent(r.data)?.pages?.map { it.imageUri }.orEmpty()
-        if (uris.isNotEmpty()) addFromGallery(uris, scanned = true)
+        val uris = if (r.resultCode != RESULT_OK) emptyList() else
+            GmsDocumentScanningResult.fromActivityResultIntent(r.data)?.pages?.map { it.imageUri }.orEmpty()
+        if (uris.isNotEmpty()) addFromGallery(uris, scanned = true) else leaveIfEmpty()
     }
 
     private val openCamera = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
         refresh()
         val added = r.data?.getIntExtra(CameraActivity.EXTRA_ADDED, 0) ?: 0
-        if (added > 0) note("${pages(added)} added")
+        if (added > 0) note("${pages(added)} added") else leaveIfEmpty()
     }
+
+    private val openOptions = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { refresh() }
 
     // Whatever the answer, the PDF is made: the permission only decides whether its notifications show.
     private val askNotifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) { startPdf() }
 
-    // An update waiting for the "install unknown apps" permission.
-    private var pendingInstall: File? = null
-
-    private val askInstallPermission = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-        val apk = pendingInstall
-        if (apk != null && Updater.canInstall(this)) install(apk)
-    }
-
-    // Hold a page to pick it up, drag it to its new place, let go.
+    // Hold a page to pick it up, drag it to its new place, let go. The "Add pages" tile stays put.
     private val dragger = ItemTouchHelper(object : ItemTouchHelper.SimpleCallback(
         ItemTouchHelper.UP or ItemTouchHelper.DOWN or ItemTouchHelper.LEFT or ItemTouchHelper.RIGHT, 0,
     ) {
         override fun isLongPressDragEnabled() = !busy
+
+        override fun getDragDirs(rv: RecyclerView, vh: RecyclerView.ViewHolder) =
+            if (vh is PhotoAdapter.Holder) super.getDragDirs(rv, vh) else 0
+
+        override fun canDropOver(rv: RecyclerView, current: RecyclerView.ViewHolder, target: RecyclerView.ViewHolder) =
+            target is PhotoAdapter.Holder
 
         override fun onMove(
             rv: RecyclerView,
@@ -122,7 +137,7 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
         ): Boolean {
             val i = from.bindingAdapterPosition
             val j = to.bindingAdapterPosition
-            if (i == RecyclerView.NO_POSITION || j == RecyclerView.NO_POSITION) return false
+            if (i !in batch.items.indices || j !in batch.items.indices) return false
             batch.items.add(j, batch.items.removeAt(i))
             adapter.notifyItemMoved(i, j)
             return true
@@ -133,29 +148,36 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
         override fun clearView(rv: RecyclerView, vh: RecyclerView.ViewHolder) {
             super.clearView(rv, vh)
             batch.save()
-            rv.post { refresh() } // renumbers the tabs after the drop
+            rv.post { refresh() } // renumbers the pages after the drop
         }
     })
 
+    private val lookHints = mapOf(
+        R.id.lOriginal to "Keeps the photos exactly as taken.",
+        R.id.lDocument to "Even lighting, white paper and crisper text, like a scanner.",
+        R.id.lVivid to "Like Document, with stronger colour and darker text.",
+        R.id.lBw to "Sharp black text on white, and the smallest files. Best for text without photos.",
+    )
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+        setContentView(R.layout.activity_review)
         batch = Batch.get(this)
         settings = Settings(this)
 
         root = findViewById(R.id.root)
         dock = findViewById(R.id.dock)
-        listHeader = findViewById(R.id.listHeader)
         countText = findViewById(R.id.countText)
-        emptyView = findViewById(R.id.empty)
+        lookGroup = findViewById(R.id.lookGroup)
+        lookHint = findViewById(R.id.lookHint)
         statusRow = findViewById(R.id.statusRow)
         statusText = findViewById(R.id.statusText)
         progress = findViewById(R.id.progress)
+        optionsRow = findViewById(R.id.optionsRow)
+        optionsText = findViewById(R.id.optionsText)
+        changeBtn = findViewById(R.id.changeBtn)
         makeBtn = findViewById(R.id.makeBtn)
-        cameraBtn = findViewById(R.id.cameraBtn)
-        galleryBtn = findViewById(R.id.galleryBtn)
-        settingsBtn = findViewById(R.id.settingsBtn)
-        clearBtn = findViewById(R.id.clearBtn)
+        discardBtn = findViewById(R.id.discardBtn)
         cancelBtn = findViewById(R.id.cancelBtn)
 
         adapter = PhotoAdapter(batch, this)
@@ -165,36 +187,69 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
         grid.adapter = adapter
         dragger.attachToRecyclerView(grid)
 
-        cameraBtn.setOnClickListener { if (settings.cropToPage) scanPages() else openOwnCamera() }
-        galleryBtn.setOnClickListener { pickPhotos.launch("image/*") }
-        settingsBtn.setOnClickListener { showSettings() }
-        findViewById<View>(R.id.documentsBtn).setOnClickListener { openDocuments() }
-        clearBtn.setOnClickListener { confirmClear() }
+        // The look is kept as soon as it is chosen, and is the same for the next scan.
+        lookGroup.check(
+            when (settings.colour) {
+                ColourMode.COLOUR -> R.id.lOriginal
+                ColourMode.DOCUMENT -> R.id.lDocument
+                ColourMode.VIVID -> R.id.lVivid
+                ColourMode.BW -> R.id.lBw
+            }
+        )
+        lookHint.text = lookHints[lookGroup.checkedButtonId]
+        lookGroup.addOnButtonCheckedListener { _, id, checked ->
+            if (!checked) return@addOnButtonCheckedListener
+            settings.colour = when (id) {
+                R.id.lDocument -> ColourMode.DOCUMENT
+                R.id.lVivid -> ColourMode.VIVID
+                R.id.lBw -> ColourMode.BW
+                else -> ColourMode.COLOUR
+            }
+            lookHint.text = lookHints[id]
+            refresh()
+        }
+
+        findViewById<View>(R.id.backBtn).setOnClickListener { finish() }
+        discardBtn.setOnClickListener { confirmDiscard() }
+        changeBtn.setOnClickListener { openOptions.launch(SettingsActivity.intent(this, pdfOnly = true)) }
         makeBtn.setOnClickListener { onMake() }
         cancelBtn.setOnClickListener { PdfJob.cancel() }
 
-        updateBanner = UpdateBanner(this, findViewById(R.id.updateBanner), ::install) { text, long -> note(text, long) }
         refresh()
         lifecycleScope.launch { repeatOnLifecycle(Lifecycle.State.STARTED) { followPdf() } }
+
+        // Scan and Photos on the home screen come here first, so pages are added in one place.
+        if (savedInstanceState == null && !busy) {
+            when (intent.getStringExtra(EXTRA_START)) {
+                START_SCAN -> scan()
+                START_PHOTOS -> pickPhotos.launch("image/*")
+            }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        refresh()
+    }
+
+    override fun onDestroy() {
+        savedSheet?.dismiss()
+        super.onDestroy()
     }
 
     /** Shows how far the PDF is and, once, how it ended. Runs whenever this screen is showing. */
     private suspend fun followPdf() {
-        // A PDF that finishes while this screen watches goes straight to the share screen. One
-        // that finished while DocNest was away is only announced: Share PDF is there for later.
-        var watched = false
         PdfJob.state.collect { s ->
             when (s) {
                 is PdfJob.Running -> {
-                    watched = true
                     setProgress(s.text, s.fraction)
                     showBusy()
                     return@collect
                 }
                 is PdfJob.Done -> if (!s.seen) {
                     s.seen = true
-                    announce(s)
-                    if (watched) share(s.file)
+                    PdfService.clearResult(this)
+                    showSaved(s)
                 }
                 PdfJob.Failed -> {
                     PdfJob.reset()
@@ -208,64 +263,25 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
         }
     }
 
-    private fun announce(d: PdfJob.Done) {
-        PdfService.clearResult(this)
-        val size = fmtBytes(d.file.length())
-        when {
-            d.saved == null -> note("PDF ready ($size), but it couldn't be saved. Tap Share PDF to send it.", long = true)
-            d.textMissing -> note(
-                "Saved ${d.saved.name}, but without searchable text: the text reader is still downloading. Try again in a few minutes.",
-                long = true, action = "View" to ::openDocuments,
-            )
-            else -> note("Saved ${d.saved.name} ($size)", long = true, action = "View" to ::openDocuments)
-        }
-    }
-
-    override fun onStart() {
-        super.onStart()
-        updateBanner.onAppOpened()
-    }
-
-    override fun onResume() {
-        super.onResume()
-        refresh()
-    }
-
     // ---------- screen state ----------
 
     private fun refresh() {
         adapter.notifyDataSetChanged()
         val n = batch.items.size
-        countText.text = pages(n)
-        listHeader.isVisible = n > 0
-        emptyView.isVisible = n == 0
+        countText.text = if (n == 0) "No pages yet" else "${pages(n)} · hold and drag to reorder"
+        discardBtn.isVisible = n > 0
+        optionsRow.isVisible = n > 0
         makeBtn.isVisible = n > 0
-        makeBtn.text = if (built?.key == stateKey()) "Share PDF" else "Make PDF"
-        // Scan is the main action until there are pages; then Make PDF takes over and Scan steps back.
-        styleAsMain(cameraBtn, n == 0)
+        makeBtn.text = if (built?.key == stateKey()) "Share PDF" else "Save PDF"
+        optionsText.text = settings.optionsLine()
         updateEnabled()
     }
 
-    private fun styleAsMain(b: MaterialButton, main: Boolean) {
-        val bg = MaterialColors.getColor(b, if (main) AppCompatR.attr.colorPrimary else MaterialR.attr.colorSecondaryContainer)
-        val fg = MaterialColors.getColor(b, if (main) MaterialR.attr.colorOnPrimary else MaterialR.attr.colorOnSecondaryContainer)
-        val onSurface = MaterialColors.getColor(b, MaterialR.attr.colorOnSurface)
-        fun states(on: Int, off: Int) = ColorStateList(
-            arrayOf(intArrayOf(-android.R.attr.state_enabled), intArrayOf()),
-            intArrayOf(off, on),
-        )
-        b.backgroundTintList = states(bg, ColorUtils.setAlphaComponent(onSurface, 31))
-        val text = states(fg, ColorUtils.setAlphaComponent(onSurface, 97))
-        b.setTextColor(text)
-        b.iconTint = text
-    }
-
     private fun updateEnabled() {
-        cameraBtn.isEnabled = !busy
-        galleryBtn.isEnabled = !busy
         makeBtn.isEnabled = !busy && batch.items.isNotEmpty()
-        settingsBtn.isEnabled = !busy
-        clearBtn.isEnabled = !busy
+        changeBtn.isEnabled = !busy
+        discardBtn.isEnabled = !busy
+        lookGroup.children.forEach { it.isEnabled = !busy }
     }
 
     /** Locks the pages and buttons while photos are being added or a PDF is being made. */
@@ -281,12 +297,16 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
         progress.setProgressCompat((fraction * 1000).toInt(), true)
     }
 
-    /** A short note above the dock, gone after a few seconds, with an optional button. */
-    private fun note(text: String, long: Boolean = false, action: Pair<String, () -> Unit>? = null) {
-        val bar = Snackbar.make(root, text, if (long) Snackbar.LENGTH_LONG else Snackbar.LENGTH_SHORT)
+    /** A short note above the dock, gone after a few seconds. */
+    private fun note(text: String, long: Boolean = false) {
+        Snackbar.make(root, text, if (long) Snackbar.LENGTH_LONG else Snackbar.LENGTH_SHORT)
             .setAnchorView(dock)
-        if (action != null) bar.setAction(action.first) { action.second() }
-        bar.show()
+            .show()
+    }
+
+    /** Back to My documents when a scan was started but nothing was added to it. */
+    private fun leaveIfEmpty() {
+        if (batch.items.isEmpty() && !adding) finish()
     }
 
     // ---------- page cards ----------
@@ -327,6 +347,20 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
                 }
             })
             .show()
+    }
+
+    override fun onAdd(anchor: View) {
+        PopupMenu(this, anchor).apply {
+            inflate(R.menu.add_pages)
+            setOnMenuItemClickListener { item ->
+                when (item.itemId) {
+                    R.id.addScan -> scan()
+                    R.id.addPhotos -> pickPhotos.launch("image/*")
+                }
+                true
+            }
+            show()
+        }
     }
 
     private fun showViewer(p: Photo) {
@@ -376,7 +410,11 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
         d.show()
     }
 
-    // ---------- adding from the gallery ----------
+    // ---------- adding pages ----------
+
+    private fun scan() {
+        if (settings.cropToPage) scanPages() else openOwnCamera()
+    }
 
     private fun openOwnCamera() {
         openCamera.launch(Intent(this, CameraActivity::class.java))
@@ -397,7 +435,7 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
             }
     }
 
-    /** Adds photos to the batch. Gallery picks go in the order they were taken; [scanned] pages keep their order. */
+    /** Adds photos to the scan. Gallery picks go in the order they were taken; [scanned] pages keep their order. */
     private fun addFromGallery(uris: List<Uri>, scanned: Boolean = false) {
         adding = true
         showBusy()
@@ -450,144 +488,30 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
         }
     }
 
-    // ---------- settings and clearing ----------
+    // ---------- discarding ----------
 
-    private fun showSettings() {
-        val sheet = BottomSheetDialog(this)
-        val v = layoutInflater.inflate(R.layout.sheet_settings, null)
-        sheet.setContentView(v)
-
-        val quality = v.findViewById<MaterialButtonToggleGroup>(R.id.qualityGroup)
-        val colour = v.findViewById<ChipGroup>(R.id.colorGroup)
-        val page = v.findViewById<MaterialButtonToggleGroup>(R.id.pageGroup)
-        val cropOn = v.findViewById<MaterialSwitch>(R.id.cropOn)
-        val searchOn = v.findViewById<MaterialSwitch>(R.id.searchOn)
-        val footOn = v.findViewById<MaterialSwitch>(R.id.footOn)
-        val footGroup = v.findViewById<View>(R.id.footGroup)
-        val footIn = v.findViewById<EditText>(R.id.footIn)
-
-        // One line under each choice says what the selected option does.
-        fun explain(group: MaterialButtonToggleGroup, hint: TextView, hints: Map<Int, String>) {
-            hint.text = hints[group.checkedButtonId]
-            group.addOnButtonCheckedListener { _, id, checked -> if (checked) hint.text = hints[id] }
-        }
-
-        quality.check(
-            when (settings.quality) {
-                Quality.SMALL -> R.id.qSmall
-                Quality.STANDARD -> R.id.qStandard
-                Quality.HIGH -> R.id.qHigh
-            }
-        )
-        colour.check(
-            when (settings.colour) {
-                ColourMode.COLOUR -> R.id.cColour
-                ColourMode.DOCUMENT -> R.id.cDocument
-                ColourMode.VIVID -> R.id.cVivid
-                ColourMode.BW -> R.id.cBw
-            }
-        )
-        page.check(if (settings.page == PageSize.A4) R.id.pA4 else R.id.pPhoto)
-        explain(
-            quality, v.findViewById(R.id.qualityHint), mapOf(
-                R.id.qSmall to "Smallest file, good for email.",
-                R.id.qStandard to "Clear text at a moderate file size.",
-                R.id.qHigh to "Sharpest text, largest file.",
-            )
-        )
-        val lookHints = mapOf(
-            R.id.cColour to "Keeps the photos exactly as taken.",
-            R.id.cDocument to "Even lighting, white paper and crisper text, like a scanner.",
-            R.id.cVivid to "Like Document, with stronger colour and darker text.",
-            R.id.cBw to "Sharp black text on white, and the smallest files. Best for text without photos.",
-        )
-        val lookHint = v.findViewById<TextView>(R.id.colourHint)
-        lookHint.text = lookHints[colour.checkedChipId]
-        colour.setOnCheckedStateChangeListener { _, ids -> ids.firstOrNull()?.let { lookHint.text = lookHints[it] } }
-        cropOn.isChecked = settings.cropToPage
-        searchOn.isChecked = settings.searchable
-        explain(
-            page, v.findViewById(R.id.pageHint), mapOf(
-                R.id.pA4 to "Each photo is fitted onto an A4 page, ready to print.",
-                R.id.pPhoto to "Each page is the size of its photo, with no white border.",
-            )
-        )
-        footOn.isChecked = settings.footerOn
-        footGroup.isVisible = settings.footerOn
-        footOn.setOnCheckedChangeListener { _, on -> footGroup.isVisible = on }
-        footIn.setText(settings.footer)
-        v.findViewById<TextView>(R.id.versionText).text = "Version ${Updater.versionName(this)}"
-        v.findViewById<View>(R.id.updateBtn).setOnClickListener {
-            sheet.dismiss()
-            updateBanner.check(manual = true)
-        }
-        v.findViewById<View>(R.id.doneBtn).setOnClickListener { sheet.dismiss() }
-
-        sheet.setOnDismissListener {
-            settings.quality = when (quality.checkedButtonId) {
-                R.id.qSmall -> Quality.SMALL
-                R.id.qHigh -> Quality.HIGH
-                else -> Quality.STANDARD
-            }
-            settings.colour = when (colour.checkedChipId) {
-                R.id.cDocument -> ColourMode.DOCUMENT
-                R.id.cVivid -> ColourMode.VIVID
-                R.id.cBw -> ColourMode.BW
-                else -> ColourMode.COLOUR
-            }
-            settings.page = if (page.checkedButtonId == R.id.pPhoto) PageSize.PHOTO else PageSize.A4
-            settings.cropToPage = cropOn.isChecked
-            settings.searchable = searchOn.isChecked
-            settings.footerOn = footOn.isChecked
-            settings.footer = footIn.text.toString()
-            refresh()
-        }
-        sheet.behavior.state = BottomSheetBehavior.STATE_EXPANDED
-        sheet.behavior.skipCollapsed = true
-        sheet.show()
-    }
-
-    private fun confirmClear() {
+    private fun confirmDiscard() {
         MaterialAlertDialogBuilder(this)
-            .setTitle("Clear This Batch?")
-            .setMessage("This deletes all ${pages(batch.items.size)} from DocNest. PDFs you already saved stay in Downloads.")
-            .setPositiveButton("Clear batch") { _, _ ->
+            .setTitle("Discard This Scan?")
+            .setMessage("This deletes all ${pages(batch.items.size)} of it from DocNest. PDFs you already saved stay in My documents.")
+            .setPositiveButton("Discard") { _, _ ->
                 batch.clear()
                 PdfJob.reset()
-                refresh()
-                note("Batch cleared")
+                finish()
             }
             .setNegativeButton("Cancel", null)
             .show()
     }
 
-    // ---------- updates (checking and downloading live in UpdateBanner) ----------
-
-    private fun install(apk: File) {
-        if (!Updater.canInstall(this)) {
-            pendingInstall = apk
-            MaterialAlertDialogBuilder(this)
-                .setTitle("Allow Updates")
-                .setMessage("To install updates, turn on “Allow from this source” for DocNest, then come back.")
-                .setPositiveButton("Open settings") { _, _ -> askInstallPermission.launch(Updater.permissionIntent(this)) }
-                .setNegativeButton("Cancel", null)
-                .show()
-            return
-        }
-        pendingInstall = null
-        startActivity(Updater.installIntent(this, apk))
-    }
-
     // ---------- making and sending the PDF ----------
 
     private fun stateKey(): String =
-        batch.items.joinToString(",") { "${it.id}:${it.rot}" } +
-            "|" + settings.summary() + "|" + settings.footerLine() + "|" + settings.fileName()
+        batch.pagesKey() + "|" + settings.summary() + "|" + settings.footerLine() + "|" + settings.fileName()
 
     private fun onMake() {
         if (busy || batch.items.isEmpty()) return
         val b = built
-        if (b != null && b.key == stateKey() && b.file.exists()) share(b.file) else makePdf()
+        if (b != null && b.key == stateKey() && b.file.exists()) showSaved(b) else makePdf()
     }
 
     private fun makePdf() {
@@ -608,6 +532,7 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
             this,
             PdfJob.Request(
                 pages = batch.items.map { PdfJob.Page(batch.photoFile(it), it.rot) },
+                pagesKey = batch.pagesKey(),
                 quality = settings.quality,
                 colour = settings.colour,
                 page = settings.page,
@@ -619,8 +544,45 @@ class MainActivity : AppCompatActivity(), PhotoAdapter.Listener {
         )
     }
 
-    private fun openDocuments() {
-        startActivity(Intent(this, DocumentsActivity::class.java))
+    /**
+     * The sheet that slides up when the PDF is made: Share, Open, or Done. Done goes back to
+     * My documents; swiping the sheet away stays here, to make the PDF again another way.
+     */
+    private fun showSaved(d: PdfJob.Done) {
+        savedSheet?.dismiss()
+        val sheet = BottomSheetDialog(this)
+        val v = layoutInflater.inflate(R.layout.sheet_saved, null)
+        sheet.setContentView(v)
+        val saved = d.saved
+        val size = fmtBytes(d.file.length())
+
+        v.findViewById<TextView>(R.id.savedTitle).text = if (saved != null) "PDF Saved" else "PDF Ready"
+        v.findViewById<TextView>(R.id.savedName).text = saved?.name ?: d.file.name
+        v.findViewById<TextView>(R.id.savedMeta).text =
+            if (saved != null) "${pages(d.pages)} · $size · ${Library.savedIn}"
+            else "${pages(d.pages)} · $size. It couldn't be saved to My documents, so share it now to keep it."
+        v.findViewById<View>(R.id.savedNote).isVisible = saved != null && d.textMissing
+
+        v.findViewById<View>(R.id.shareBtn).setOnClickListener { share(d.file) }
+        v.findViewById<View>(R.id.openBtn).apply {
+            isVisible = saved != null
+            setOnClickListener {
+                try {
+                    startActivity(Library.openIntent(saved!!))
+                } catch (e: ActivityNotFoundException) {
+                    // A toast: a note on the screen behind would be hidden by the sheet.
+                    Toast.makeText(context, "No app on this phone can open PDFs. Install a PDF viewer, such as Google Drive.", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+        v.findViewById<View>(R.id.doneBtn).setOnClickListener {
+            sheet.dismiss()
+            finish()
+        }
+        sheet.behavior.state = BottomSheetBehavior.STATE_EXPANDED
+        sheet.behavior.skipCollapsed = true
+        sheet.show()
+        savedSheet = sheet
     }
 
     private fun share(file: File) {
