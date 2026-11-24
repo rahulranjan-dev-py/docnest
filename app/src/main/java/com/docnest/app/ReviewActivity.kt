@@ -198,7 +198,7 @@ class ReviewActivity : AppCompatActivity(), PhotoAdapter.Listener {
         R.id.lOriginal to "Keeps the photos exactly as taken.",
         R.id.lDocument to "Even lighting, white paper and crisper text, like a scanner.",
         R.id.lVivid to "Like Document, with stronger colour and darker text.",
-        R.id.lBw to "Sharp black text on white, and the smallest files. Best for text without photos.",
+        R.id.lBw to "Sharp black text on white, photos as fine dots, and the smallest files.",
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {

@@ -30,11 +30,12 @@ into a PDF.
 - **Choose the look** on that same screen. The pages show the new look straight away:
   - **Original:** the photo as taken.
   - **Document:** like a scanner. Lighting is evened out, shadows and yellowed paper turn white,
-    and text is sharpened.
+    and text is sharpened. Photos, coloured boxes and highlighter keep their colours, and a page
+    photographed in dim light still comes out white.
   - **Vivid:** Document with stronger colour and darker text.
   - **B&W:** pure black text on white, judged spot by spot so faint print and shaded areas stay
-    readable, with stray specks cleaned up. Pages are stored at 1 bit per pixel, so the PDF is much
-    smaller. Best for pages of text; photos in the article turn into rough black-and-white patterns.
+    readable, with stray specks cleaned up. Photos are printed as fine dots, like in a newspaper.
+    Pages are stored at 1 bit per pixel, so the PDF is much smaller.
 - **PDF options.** One line above **Save PDF** shows the quality, the page size (A4 or photo size)
   and whether there is a footer or searchable text. Tap **Change** to alter them.
 - **Searchable text** (a switch in Settings, off by default). DocNest reads the English text on
