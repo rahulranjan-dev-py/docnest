@@ -1,6 +1,7 @@
 package com.docnest.app
 
 import android.graphics.Bitmap
+import android.graphics.Color
 import java.io.ByteArrayOutputStream
 import java.util.zip.Deflater
 import java.util.zip.DeflaterOutputStream
@@ -193,6 +194,36 @@ object Enhance {
      * print and text in a shadow readable, where one threshold for the whole page would lose it.
      */
     fun bitonal(bmp: Bitmap): Bitonal {
+        val bits = bitonalBits(bmp)
+        val packed = ByteArrayOutputStream(bits.size / 8)
+        val deflater = Deflater(Deflater.BEST_COMPRESSION)
+        try {
+            DeflaterOutputStream(packed, deflater).use { it.write(bits) }
+        } finally {
+            deflater.end() // a Deflater we created isn't freed by closing the stream
+        }
+        return Bitonal(bmp.width, bmp.height, packed.toByteArray())
+    }
+
+    /** [bitonal]'s black and white pixels as a picture, to show a page before its PDF is made. */
+    fun bitonalPreview(bmp: Bitmap): Bitmap {
+        val w = bmp.width
+        val h = bmp.height
+        val bits = bitonalBits(bmp)
+        val rowBytes = (w + 7) / 8
+        val px = IntArray(w * h)
+        for (y in 0 until h) {
+            val row = y * rowBytes
+            for (x in 0 until w) {
+                val white = (bits[row + (x shr 3)].toInt() and (0x80 ushr (x and 7))) != 0
+                px[y * w + x] = if (white) Color.WHITE else Color.BLACK
+            }
+        }
+        return Bitmap.createBitmap(px, w, h, Bitmap.Config.RGB_565)
+    }
+
+    /** One bit per pixel, rows packed from the left, 1 = white. */
+    private fun bitonalBits(bmp: Bitmap): ByteArray {
         val w = bmp.width
         val h = bmp.height
         val px = IntArray(w * h)
@@ -253,14 +284,6 @@ object Enhance {
                 }
             }
         }
-
-        val packed = ByteArrayOutputStream(bits.size / 8)
-        val deflater = Deflater(Deflater.BEST_COMPRESSION)
-        try {
-            DeflaterOutputStream(packed, deflater).use { it.write(bits) }
-        } finally {
-            deflater.end() // a Deflater we created isn't freed by closing the stream
-        }
-        return Bitonal(w, h, packed.toByteArray())
+        return bits
     }
 }

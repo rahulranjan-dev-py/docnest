@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Hold the DocNest icon on the home screen for these. Each opens My documents with the scan on
+  top, so Back leads home. The actions are handled in ReviewActivity.handleStart.
+-->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_scan"
+        android:shortcutId="scan"
+        android:shortcutLongLabel="@string/shortcut_scan_long"
+        android:shortcutShortLabel="@string/shortcut_scan_short">
+        <intent
+            android:action="android.intent.action.MAIN"
+            android:targetClass="com.docnest.app.MainActivity"
+            android:targetPackage="com.docnest.app" />
+        <intent
+            android:action="com.docnest.app.action.SCAN"
+            android:targetClass="com.docnest.app.ReviewActivity"
+            android:targetPackage="com.docnest.app" />
+    </shortcut>
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_photos"
+        android:shortcutId="photos"
+        android:shortcutLongLabel="@string/shortcut_photos_long"
+        android:shortcutShortLabel="@string/shortcut_photos_short">
+        <intent
+            android:action="android.intent.action.MAIN"
+            android:targetClass="com.docnest.app.MainActivity"
+            android:targetPackage="com.docnest.app" />
+        <intent
+            android:action="com.docnest.app.action.PHOTOS"
+            android:targetClass="com.docnest.app.ReviewActivity"
+            android:targetPackage="com.docnest.app" />
+    </shortcut>
+</shortcuts>

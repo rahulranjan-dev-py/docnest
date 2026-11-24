@@ -13,10 +13,21 @@ into a PDF.
   Off keeps the whole photo, which suits several articles in one shot.
 - **Photos** makes a PDF from pictures in your gallery. They are sorted by the time they were
   taken, with a note if any were taken before today.
-- **Check before you save.** After scanning you see the pages on one screen, **New PDF**. Hold a
-  page and drag it to reorder. Rotate or delete it (with Undo). Tap a page to see it large. **Add
-  pages** scans more or adds photos.
-- **Choose the look** on that same screen:
+- **Share photos to DocNest.** In Gallery, Google Photos, WhatsApp or any other app, choose photos,
+  tap **Share** and pick **DocNest**: they become the pages of a new PDF. If a scan is waiting
+  unsaved, DocNest asks whether to add them to it or start a new one.
+- **Shortcuts on the icon.** Hold the DocNest icon on your home screen for **Scan** and **Photos**.
+- **Check before you save.** After scanning you see the pages on one screen, **New PDF**, each as
+  it will look in the PDF: cropped, turned and in the look you chose. Hold a page and drag it to
+  reorder. Rotate, crop or delete it (with Undo). **Add pages** scans more or adds photos.
+- **Crop a page.** Tap the crop button on a page and drag its four corners to the page's edges; a
+  magnifier shows the corner you are moving. DocNest cuts the page out and straightens it, so a page
+  photographed at a slant, on a desk, comes out flat and square. **Whole photo** undoes it.
+- **Look closely.** Tap a page to see it large. Pinch or double-tap to zoom in and check that the
+  text is sharp; swipe sideways for the other pages. From there you can also **Rotate**, **Crop**,
+  **Retake** (take that page again, in the same place: handy for a page marked **Blurry?**),
+  **Delete**, or **Move** it elsewhere in the PDF.
+- **Choose the look** on that same screen. The pages show the new look straight away:
   - **Original:** the photo as taken.
   - **Document:** like a scanner. Lighting is evened out, shadows and yellowed paper turn white,
     and text is sharpened.
@@ -30,11 +41,11 @@ into a PDF.
   each page and hides it behind the picture, so you can search and copy words in the PDF. Making
   the PDF takes longer. The text reader comes from Google Play services and downloads itself the
   first time.
-- **File names** are always `Scan_<date>.pdf`; a second PDF on the same day gets "(1)" added. You
-  can rename a PDF in My documents.
+- **File names** start as `Scan_<date>.pdf`; a second PDF on the same day gets "(1)" added. Tap
+  **Rename** as soon as the PDF is saved, or rename it later in My documents.
 - **Save, then share.** **Save PDF** puts the file in **Downloads**. A sheet then offers **Share**
-  (WhatsApp, Gmail or any other app), **Open** and **Done**. Swipe the sheet away to stay with the
-  pages and save them again with another look.
+  (WhatsApp, Gmail or any other app), **Open**, **Rename** and **Done**. Swipe the sheet away to stay
+  with the pages and save them again with another look.
 - **An unfinished scan waits for you.** Pages you scanned but haven't saved show as a card at the
   top of My documents, with **Continue**. Once a scan is saved and you leave it, its pages are
   cleared; the PDF stays. **Discard** throws a scan away.
@@ -43,13 +54,16 @@ into a PDF.
   when the PDF is ready. Android 13 and newer ask once whether DocNest may show notifications; the
   PDF is made either way.
 - **My documents.** Tap a PDF to open it, tap the star to keep it under **Favourites**, or use **⋮**
-  to share, rename or delete it. Deleting has an Undo. **Search** finds documents by name, and by the
-  words inside searchable PDFs: type the start of one or more words, and it stays quick however many
-  documents you have. These are the same files as in Downloads, so a rename or delete here
-  changes the file there too.
-- **Delete several at once.** Hold a document (or choose **Select** under **⋮**), tap the others,
-  then tap the bin at the top. **Select all** picks everything in the list. DocNest asks before
-  deleting more than one, and the delete can still be undone for a few seconds.
+  to share, print, rename or delete it. Deleting has an Undo. **Search** finds documents by name,
+  and by the words inside searchable PDFs ("Found in the text inside" says which): type the start
+  of one or more words, and it stays quick however many documents you have. The button beside the
+  filters orders the list: newest or oldest first, by name, or largest first. These are the same
+  files as in Downloads, so a rename or delete here changes the file there too.
+- **Print.** **⋮ → Print** opens Android's print screen: any printer on your Wi-Fi, or **Save as
+  PDF**.
+- **Share or delete several at once.** Hold a document (or choose **Select** under **⋮**), tap the
+  others, then tap share or the bin at the top. **Select all** picks everything in the list.
+  DocNest asks before deleting more than one, and the delete can still be undone for a few seconds.
 - **Settings** (the gear at the top of My documents): quality, page size, crop to page edges,
   searchable text, the footer, and the app's version.
 - **Updates itself.** When a new version is out, a card appears at the top: **What's new**, **Later**,
@@ -142,10 +156,10 @@ over the old ones.
 1. Tap **Scan** and shoot your pages, one after another. Fit each page inside the frame; what you
    see on screen is exactly what goes into the PDF. Tap the screen to focus. The lightning button
    turns on the torch for dim rooms.
-2. Tap **Done**. Check the pages: hold and drag to reorder, rotate or delete. Tap a page to see it
-   large. Choose the look at the top.
-3. Tap **Save PDF**. It is saved in Downloads, and a sheet slides up: tap **Share** and choose
-   WhatsApp, Gmail or any other app.
+2. Tap **Done**. Check the pages: hold and drag to reorder; rotate, crop or delete. Tap a page to
+   see it large. Choose the look at the top; the pages change to show it.
+3. Tap **Save PDF**. It is saved in Downloads, and a sheet slides up: tap **Rename** to give it a
+   name, then **Share** and choose WhatsApp, Gmail or any other app.
 4. Tap **Done**. You are back in **My documents**, with your new PDF at the top.
 
 ---

@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Slides up when the PDF is made: share it, open it, or finish. -->
+<!-- Slides up when the PDF is made: share it, open it, rename it, or finish. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
@@ -53,6 +53,15 @@
         android:gravity="center"
         android:textAppearance="?attr/textAppearanceBodyMedium"
         android:textColor="?attr/colorOnSurfaceVariant" />
+
+    <!-- The name is always Scan_<date>: give it a better one right away -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/renameBtn"
+        style="@style/Widget.Material3.Button.TextButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Rename"
+        app:icon="@drawable/ic_edit" />
 
     <!-- Only when the PDF was meant to be searchable and isn't -->
     <TextView
