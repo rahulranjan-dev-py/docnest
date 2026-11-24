@@ -40,15 +40,36 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- Hold the app icon: Scan and Photos, straight away. -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity-alias>
 
         <!-- A scan before it is saved. Turning the phone must not restart the screen, or photos
-             being added would be lost. -->
+             being added would be lost. Photos shared from other apps (Gallery, WhatsApp…) come
+             here, so it is open to other apps; it takes only their content (see sharedImages).
+             singleTask: one of it, in DocNest's task, however it is opened. -->
         <activity
             android:name=".ReviewActivity"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:parentActivityName=".DocumentsActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
+        </activity>
+
+        <!-- Cropping one page. Always dark, like the camera. -->
+        <activity
+            android:name=".CropActivity"
             android:exported="false"
-            android:parentActivityName=".DocumentsActivity" />
+            android:theme="@style/Theme.DocNest.Dark" />
 
         <activity
             android:name=".SettingsActivity"

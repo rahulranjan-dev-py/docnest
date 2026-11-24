@@ -44,5 +44,7 @@
     <!-- Behind a page thumbnail, so white paper still shows its edges -->
     <color name="page_well">#E6ECE8</color>
     <color name="icon_bg">#0A7453</color>
+    <!-- Behind the shortcut icons; the same in dark mode, like the app icon. -->
+    <color name="shortcut_bg">#DDF3E9</color>
     <bool name="light_bars">true</bool>
 </resources>

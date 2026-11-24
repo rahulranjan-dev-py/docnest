@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.RectF
 import androidx.exifinterface.media.ExifInterface
@@ -12,6 +13,7 @@ import java.io.File
 import java.io.InputStream
 import java.text.SimpleDateFormat
 import java.util.Locale
+import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -126,16 +128,90 @@ object Images {
     }
 
     /**
-     * A stored photo, ready for a PDF page or the viewer. Document and Vivid clean it up here;
+     * A stored photo, ready for a PDF page or the viewer: cropped to [crop] (see [Crop]), turned
+     * clockwise by [degrees] and at most [edge] px. Document and Vivid clean it up here;
      * [ColourMode.BW] is turned into 1-bit pixels later, by [Enhance.bitonal].
      */
-    fun load(photo: File, edge: Int, degrees: Int, colour: ColourMode = ColourMode.COLOUR): Bitmap? {
-        val src = decodeSampled({ photo.inputStream() }, edge) ?: return null
+    fun load(
+        photo: File,
+        edge: Int,
+        degrees: Int,
+        colour: ColourMode = ColourMode.COLOUR,
+        crop: FloatArray? = null,
+    ): Bitmap? {
+        // A crop keeps part of the photo, so read the photo larger to keep that part sharp.
+        val readEdge = if (crop == null) edge else (edge / Crop.span(crop)).roundToInt()
+        var src = decodeSampled({ photo.inputStream() }, readEdge) ?: return null
+        if (crop != null) {
+            val cut = warp(src, crop)
+            src.recycle()
+            src = cut
+        }
         val out = render(src, edge, degrees)
         src.recycle()
         if (colour == ColourMode.DOCUMENT || colour == ColourMode.VIVID) {
             Enhance.document(out, vivid = colour == ColourMode.VIVID)
         }
         return out
+    }
+
+    /**
+     * The part of [src] inside [quad] (see [Crop]), straightened into a rectangle: a page
+     * photographed at a slant comes out square on. The rectangle is as long as the outline's
+     * longer sides, so no detail is lost.
+     */
+    fun warp(src: Bitmap, quad: FloatArray): Bitmap {
+        val w = src.width.toFloat()
+        val h = src.height.toFloat()
+        val from = FloatArray(8) { quad[it] * if (it % 2 == 0) w else h }
+        fun side(a: Int, b: Int) = hypot(from[2 * a] - from[2 * b], from[2 * a + 1] - from[2 * b + 1])
+        val outW = max(1, max(side(0, 1), side(3, 2)).roundToInt())
+        val outH = max(1, max(side(0, 3), side(1, 2)).roundToInt())
+        val to = floatArrayOf(0f, 0f, outW.toFloat(), 0f, outW.toFloat(), outH.toFloat(), 0f, outH.toFloat())
+        val out = Bitmap.createBitmap(outW, outH, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(out)
+        canvas.drawColor(Color.WHITE)
+        val paint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
+        val m = Matrix()
+        if (m.setPolyToPoly(from, 0, to, 0, 4)) {
+            canvas.drawBitmap(src, m, paint)
+        } else {
+            canvas.drawBitmap(src, null, RectF(0f, 0f, outW.toFloat(), outH.toFloat()), paint)
+        }
+        return out
+    }
+
+    /**
+     * A page as it will look in the PDF, for the page cards and the viewer. It is worked out at
+     * [workEdge] px, near the size the PDF is made at, so the look matches, then shrunk to
+     * [showEdge]. Off the main thread: B&W takes a moment.
+     */
+    fun preview(
+        photo: File,
+        workEdge: Int,
+        showEdge: Int,
+        degrees: Int,
+        colour: ColourMode,
+        crop: FloatArray?,
+    ): Bitmap? {
+        var bmp = load(photo, workEdge, degrees, colour, crop) ?: return null
+        if (colour == ColourMode.BW) {
+            val bw = Enhance.bitonalPreview(bmp)
+            bmp.recycle()
+            bmp = bw
+        }
+        if (max(bmp.width, bmp.height) > showEdge) {
+            val small = render(bmp, showEdge, 0)
+            bmp.recycle()
+            bmp = small
+        }
+        return bmp
+    }
+
+    /** Makes a page's small picture again after its crop changed, and returns it. */
+    fun makeThumb(photo: File, crop: FloatArray?, thumb: File): Bitmap? {
+        val small = load(photo, THUMB_EDGE, 0, ColourMode.COLOUR, crop) ?: return null
+        thumb.outputStream().use { small.compress(Bitmap.CompressFormat.JPEG, 72, it) }
+        return small
     }
 }

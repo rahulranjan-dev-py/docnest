@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">DocNest</string>
+
+    <!-- The shortcuts on the app icon (res/xml/shortcuts.xml): a short and a long label each. -->
+    <string name="shortcut_scan_short">Scan</string>
+    <string name="shortcut_scan_long">Scan pages</string>
+    <string name="shortcut_photos_short">Photos</string>
+    <string name="shortcut_photos_long">PDF from photos</string>
 </resources>

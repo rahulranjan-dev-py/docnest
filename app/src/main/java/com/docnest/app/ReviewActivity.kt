@@ -3,6 +3,7 @@ package com.docnest.app
 import android.Manifest
 import android.app.Dialog
 import android.content.ActivityNotFoundException
+import android.content.ContentResolver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -10,7 +11,6 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.view.View
-import android.widget.ImageView
 import android.widget.PopupMenu
 import android.widget.TextView
 import android.widget.Toast
@@ -19,6 +19,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.core.content.IntentCompat
 import androidx.core.view.children
 import androidx.core.view.isVisible
 import androidx.lifecycle.Lifecycle
@@ -38,21 +39,26 @@ import com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanning
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.Calendar
-import java.util.Collections
 import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
- * A scan before it is saved ("New PDF"): choose the look, check the pages (drag to reorder,
- * rotate, delete, add more), then Save PDF. When the PDF is made a sheet offers Share, Open and
- * Done. The pages stay for as long as this screen does, so the PDF can be made again with
+ * A scan before it is saved ("New PDF"): choose the look, check the pages (drag to reorder;
+ * rotate, crop, retake or delete; add more), then Save PDF. The page cards and the viewer show
+ * each page as it will look in the PDF. When the PDF is made a sheet offers Share, Open, Rename
+ * and Done. The pages stay for as long as this screen does, so the PDF can be made again with
  * another look; once the screen is left, a saved scan is finished (see [Batch.clearIfSaved]).
+ *
+ * Photos shared from another app (Gallery → Share → DocNest) arrive here too. There is only ever
+ * one of this screen (launchMode singleTask), in DocNest's own task, so a share never opens a
+ * second copy of the scan.
  */
 class ReviewActivity : AppCompatActivity(), PhotoAdapter.Listener {
 
@@ -62,7 +68,15 @@ class ReviewActivity : AppCompatActivity(), PhotoAdapter.Listener {
 
         /** Open the photo picker straight away. */
         const val START_PHOTOS = "photos"
+
+        /** The home-screen shortcuts' actions (see res/xml/shortcuts.xml). */
+        const val ACTION_SCAN = "com.docnest.app.action.SCAN"
+        const val ACTION_PHOTOS = "com.docnest.app.action.PHOTOS"
+
         private const val EXTRA_START = "start"
+
+        // A share of more photos than this is cut short: nobody means to make a PDF that long.
+        private const val MAX_SHARED = 100
 
         fun intent(context: Context, start: String? = null): Intent =
             Intent(context, ReviewActivity::class.java).putExtra(EXTRA_START, start)
@@ -88,6 +102,16 @@ class ReviewActivity : AppCompatActivity(), PhotoAdapter.Listener {
     private var savedSheet: BottomSheetDialog? = null
     private var adding = false // photos are being added to the scan
 
+    // The page viewer, while it is open: show a page in it, or show its page again after a change.
+    private var viewerShow: ((Photo) -> Unit)? = null
+    private var viewerReload: (() -> Unit)? = null
+
+    // A page being retaken with Google's page scanner.
+    private var replacing: Photo? = null
+
+    // Photos shared while a PDF was being made or photos were being added: taken in afterwards.
+    private var waitingShare: List<Uri>? = null
+
     // The PDF is made by PdfJob, outside this screen, so it carries on when the screen is left.
     private val making get() = PdfJob.running
     private val busy get() = adding || making
@@ -104,13 +128,31 @@ class ReviewActivity : AppCompatActivity(), PhotoAdapter.Listener {
     private val pageScanner = registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { r ->
         val uris = if (r.resultCode != RESULT_OK) emptyList() else
             GmsDocumentScanningResult.fromActivityResultIntent(r.data)?.pages?.map { it.imageUri }.orEmpty()
-        if (uris.isNotEmpty()) addFromGallery(uris, scanned = true) else leaveIfEmpty()
+        val old = replacing
+        replacing = null
+        when {
+            old != null -> uris.firstOrNull()?.let { replaceWith(old, it) }
+            uris.isNotEmpty() -> addFromGallery(uris, scanned = true)
+            else -> leaveIfEmpty()
+        }
     }
 
     private val openCamera = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
         refresh()
         val added = r.data?.getIntExtra(CameraActivity.EXTRA_ADDED, 0) ?: 0
         if (added > 0) note("${pages(added)} added") else leaveIfEmpty()
+    }
+
+    private val retakeCamera = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        refresh()
+        r.data?.getStringExtra(CameraActivity.EXTRA_NEW_ID)?.let { retaken(it) }
+    }
+
+    private val openCrop = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        if (r.resultCode == RESULT_OK) {
+            refresh()
+            viewerReload?.invoke()
+        }
     }
 
     private val openOptions = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { refresh() }
@@ -156,7 +198,7 @@ class ReviewActivity : AppCompatActivity(), PhotoAdapter.Listener {
         R.id.lOriginal to "Keeps the photos exactly as taken.",
         R.id.lDocument to "Even lighting, white paper and crisper text, like a scanner.",
         R.id.lVivid to "Like Document, with stronger colour and darker text.",
-        R.id.lBw to "Sharp black text on white, and the smallest files. Best for text without photos.",
+        R.id.lBw to "Sharp black text on white, photos as fine dots, and the smallest files.",
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -180,7 +222,8 @@ class ReviewActivity : AppCompatActivity(), PhotoAdapter.Listener {
         discardBtn = findViewById(R.id.discardBtn)
         cancelBtn = findViewById(R.id.cancelBtn)
 
-        adapter = PhotoAdapter(batch, this)
+        adapter = PhotoAdapter(batch, lifecycleScope, this)
+        adapter.look = settings.colour
         val grid = findViewById<RecyclerView>(R.id.grid)
         val dm = resources.displayMetrics
         grid.layoutManager = GridLayoutManager(this, max(2, (dm.widthPixels / dm.density / 160).toInt()))
@@ -205,11 +248,12 @@ class ReviewActivity : AppCompatActivity(), PhotoAdapter.Listener {
                 R.id.lBw -> ColourMode.BW
                 else -> ColourMode.COLOUR
             }
+            adapter.look = settings.colour
             lookHint.text = lookHints[id]
             refresh()
         }
 
-        findViewById<View>(R.id.backBtn).setOnClickListener { finish() }
+        findViewById<View>(R.id.backBtn).setOnClickListener { goHome() }
         discardBtn.setOnClickListener { confirmDiscard() }
         changeBtn.setOnClickListener { openOptions.launch(SettingsActivity.intent(this, pdfOnly = true)) }
         makeBtn.setOnClickListener { onMake() }
@@ -218,13 +262,14 @@ class ReviewActivity : AppCompatActivity(), PhotoAdapter.Listener {
         refresh()
         lifecycleScope.launch { repeatOnLifecycle(Lifecycle.State.STARTED) { followPdf() } }
 
-        // Scan and Photos on the home screen come here first, so pages are added in one place.
-        if (savedInstanceState == null && !busy) {
-            when (intent.getStringExtra(EXTRA_START)) {
-                START_SCAN -> scan()
-                START_PHOTOS -> pickPhotos.launch("image/*")
-            }
-        }
+        if (savedInstanceState == null) handleStart(intent)
+    }
+
+    // Only one of this screen exists, so a share or a shortcut while it is open arrives here.
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleStart(intent)
     }
 
     override fun onResume() {
@@ -260,6 +305,7 @@ class ReviewActivity : AppCompatActivity(), PhotoAdapter.Listener {
             }
             showBusy()
             refresh()
+            takeWaitingShare()
         }
     }
 
@@ -304,9 +350,15 @@ class ReviewActivity : AppCompatActivity(), PhotoAdapter.Listener {
             .show()
     }
 
-    /** Back to My documents when a scan was started but nothing was added to it. */
+    /** Back to where this screen was opened from when a scan was started but nothing was added. */
     private fun leaveIfEmpty() {
         if (batch.items.isEmpty() && !adding) finish()
+    }
+
+    /** To My documents. Opened from another app, this screen has nothing under it, so My documents is opened. */
+    private fun goHome() {
+        if (isTaskRoot) startActivity(Intent(this, DocumentsActivity::class.java))
+        finish()
     }
 
     // ---------- page cards ----------
@@ -320,10 +372,13 @@ class ReviewActivity : AppCompatActivity(), PhotoAdapter.Listener {
         refresh()
     }
 
-    private fun move(i: Int, by: Int) {
-        val j = i + by
-        if (j !in batch.items.indices) return
-        Collections.swap(batch.items, i, j)
+    override fun onCrop(i: Int) {
+        openCrop.launch(CropActivity.intent(this, batch.items[i]))
+    }
+
+    private fun moveTo(i: Int, j: Int) {
+        if (i !in batch.items.indices || j !in batch.items.indices || i == j) return
+        batch.items.add(j, batch.items.removeAt(i))
         batch.save()
         refresh()
     }
@@ -363,54 +418,108 @@ class ReviewActivity : AppCompatActivity(), PhotoAdapter.Listener {
         }
     }
 
-    private fun showViewer(p: Photo) {
+    /**
+     * One page, large, as it will look in the PDF. Pinch or double-tap to zoom; swipe for the
+     * other pages. Rotate, crop, retake or delete it; Move puts it elsewhere in the PDF.
+     */
+    private fun showViewer(start: Photo) {
         val d = Dialog(this, R.style.Theme_DocNest_Viewer)
         d.setContentView(R.layout.dialog_viewer)
-        val img = d.findViewById<ImageView>(R.id.viewImg)
+        val img = d.findViewById<ZoomImageView>(R.id.viewImg)
         val title = d.findViewById<TextView>(R.id.viewTitle)
-        val earlier = d.findViewById<View>(R.id.vEarlier)
-        val later = d.findViewById<View>(R.id.vLater)
+        val sub = d.findViewById<TextView>(R.id.viewSub)
+        val blurNote = d.findViewById<View>(R.id.vNote)
+        val moveBtn = d.findViewById<View>(R.id.vMove)
+        var p = start
+        var loading: Job? = null
 
         fun showPlace() {
             val i = batch.items.indexOf(p)
-            title.text = "Page ${i + 1} of ${batch.items.size}"
-            img.contentDescription = "Page ${i + 1}"
-            earlier.isEnabled = i > 0
-            later.isEnabled = i < batch.items.size - 1
-            earlier.alpha = if (earlier.isEnabled) 1f else 0.38f
-            later.alpha = if (later.isEnabled) 1f else 0.38f
+            val n = batch.items.size
+            title.text = "Page ${i + 1} of $n"
+            sub.text = if (n > 1) "As in the PDF · swipe for more" else "As it will look in the PDF"
+            img.contentDescription = "Page ${i + 1}" + if (p.blurry) ". It may be blurry." else ""
+            blurNote.isVisible = p.blurry
+            moveBtn.isVisible = n > 1
         }
 
         fun showImage() {
-            lifecycleScope.launch {
-                val b = withContext(Dispatchers.IO) { Images.load(batch.photoFile(p), 1600, p.rot) }
-                img.setImageBitmap(b)
+            loading?.cancel()
+            // The card's picture at once; the sharp one when it's made.
+            img.setImageBitmap(adapter.cached(p))
+            val photo = p
+            val file = batch.photoFile(photo)
+            val rot = photo.rot
+            val crop = photo.crop?.copyOf()
+            val look = settings.colour
+            loading = lifecycleScope.launch {
+                val large = withContext(Dispatchers.Default) {
+                    runCatching { Images.preview(file, VIEW_EDGE, VIEW_EDGE, rot, look, crop) }.getOrNull()
+                }
+                if (large != null && photo === p) img.setImageBitmap(large)
             }
         }
 
-        earlier.setOnClickListener {
-            move(batch.items.indexOf(p), -1)
+        fun show(next: Photo) {
+            p = next
             showPlace()
+            showImage()
         }
-        later.setOnClickListener {
-            move(batch.items.indexOf(p), 1)
-            showPlace()
+
+        img.onSwipe = { forward ->
+            batch.items.getOrNull(batch.items.indexOf(p) + if (forward) 1 else -1)?.let { show(it) }
+        }
+        moveBtn.setOnClickListener { anchor ->
+            val i = batch.items.indexOf(p)
+            val last = batch.items.size - 1
+            PopupMenu(this, anchor).apply {
+                inflate(R.menu.move_page)
+                menu.findItem(R.id.moveEarlier).isEnabled = i > 0
+                menu.findItem(R.id.moveFirst).isEnabled = i > 0
+                menu.findItem(R.id.moveLater).isEnabled = i < last
+                menu.findItem(R.id.moveLast).isEnabled = i < last
+                setOnMenuItemClickListener { item ->
+                    moveTo(
+                        i,
+                        when (item.itemId) {
+                            R.id.moveEarlier -> i - 1
+                            R.id.moveLater -> i + 1
+                            R.id.moveFirst -> 0
+                            else -> last
+                        },
+                    )
+                    showPlace()
+                    true
+                }
+                show()
+            }
         }
         d.findViewById<View>(R.id.vRot).setOnClickListener {
             onRotate(batch.items.indexOf(p))
             showImage()
         }
+        d.findViewById<View>(R.id.vCrop).setOnClickListener { openCrop.launch(CropActivity.intent(this, p)) }
+        d.findViewById<View>(R.id.vRetake).setOnClickListener { retake(p) }
         d.findViewById<View>(R.id.vDel).setOnClickListener {
             d.dismiss()
             onRemove(batch.items.indexOf(p))
         }
         d.findViewById<View>(R.id.vClose).setOnClickListener { d.dismiss() }
-        showPlace()
-        showImage()
+        d.setOnDismissListener {
+            loading?.cancel()
+            viewerShow = null
+            viewerReload = null
+        }
+        viewerShow = { show(it) }
+        viewerReload = {
+            showPlace()
+            showImage()
+        }
+        show(start)
         d.show()
     }
 
-    // ---------- adding pages ----------
+    // ---------- adding and retaking pages ----------
 
     private fun scan() {
         if (settings.cropToPage) scanPages() else openOwnCamera()
@@ -420,19 +529,70 @@ class ReviewActivity : AppCompatActivity(), PhotoAdapter.Listener {
         openCamera.launch(Intent(this, CameraActivity::class.java))
     }
 
-    /** Google's page scanner (basic mode: crop, rotate, reorder; DocNest applies its own looks). */
-    private fun scanPages() {
+    /**
+     * Google's page scanner (basic mode: crop, rotate, reorder; DocNest applies its own looks).
+     * With [replace], it takes one page to put in that page's place.
+     */
+    private fun scanPages(replace: Photo? = null) {
         val options = GmsDocumentScannerOptions.Builder()
             .setScannerMode(GmsDocumentScannerOptions.SCANNER_MODE_BASE)
-            .setGalleryImportAllowed(true)
+            .setGalleryImportAllowed(replace == null)
             .setResultFormats(GmsDocumentScannerOptions.RESULT_FORMAT_JPEG)
+            .apply { if (replace != null) setPageLimit(1) }
             .build()
         GmsDocumentScanning.getClient(options).getStartScanIntent(this)
-            .addOnSuccessListener { sender -> pageScanner.launch(IntentSenderRequest.Builder(sender).build()) }
+            .addOnSuccessListener { sender ->
+                replacing = replace
+                pageScanner.launch(IntentSenderRequest.Builder(sender).build())
+            }
             .addOnFailureListener {
                 note("Page cropping isn't available on this phone, so the regular camera opened.", long = true)
-                openOwnCamera()
+                if (replace != null) retakeWithCamera(replace) else openOwnCamera()
             }
+    }
+
+    /** Takes a page again, in the same place: for a blurry photo, say. */
+    private fun retake(p: Photo) {
+        if (settings.cropToPage) scanPages(replace = p) else retakeWithCamera(p)
+    }
+
+    private fun retakeWithCamera(p: Photo) {
+        retakeCamera.launch(CameraActivity.retakeIntent(this, p, batch.items.indexOf(p) + 1))
+    }
+
+    private fun retaken(newId: String) {
+        val p = batch.items.firstOrNull { it.id == newId } ?: return
+        val show = viewerShow
+        if (show != null) show(p) else note("Page ${batch.items.indexOf(p) + 1} taken again")
+    }
+
+    /** Puts the photo at [uri] in [old]'s place. */
+    private fun replaceWith(old: Photo, uri: Uri) {
+        adding = true
+        showBusy()
+        setProgress("Adding the new photo…", 0f)
+        lifecycleScope.launch {
+            val p = batch.newPhoto()
+            val stored = withContext(Dispatchers.IO) {
+                runCatching {
+                    val exif = contentResolver.openInputStream(uri)!!.use { Images.readExif(it) }
+                    Images.store({ contentResolver.openInputStream(uri)!! }, exif.degrees, batch.photoFile(p), batch.thumbFile(p))
+                }.getOrNull()
+            }
+            adding = false
+            showBusy()
+            if (stored == null) {
+                batch.deleteFiles(p)
+                note("The new photo couldn't be opened, so the page is unchanged.", long = true)
+            } else {
+                p.blurry = stored.blurry
+                adapter.putThumb(p, stored.thumb)
+                batch.replace(old, p)
+                retaken(p.id)
+            }
+            refresh()
+            takeWaitingShare()
+        }
     }
 
     /** Adds photos to the scan. Gallery picks go in the order they were taken; [scanned] pages keep their order. */
@@ -480,12 +640,103 @@ class ReviewActivity : AppCompatActivity(), PhotoAdapter.Listener {
             showBusy()
             refresh()
             val added = order.size - failed
+            val none = "${if (failed == 1) "That photo" else "Those photos"} couldn't be opened."
             when {
+                // Nothing to show here: say so in a toast, which stays when the screen closes.
+                added == 0 && batch.items.isEmpty() -> Toast.makeText(this@ReviewActivity, none, Toast.LENGTH_LONG).show()
+                added == 0 -> note(none, long = true)
                 failed > 0 -> note("${pages(added)} added. ${photos(failed)} couldn't be opened.", long = true)
                 older > 0 -> note("${pages(added)} added, including $older taken before today.", long = true)
                 else -> note("${pages(added)} added")
             }
+            takeWaitingShare()
+            leaveIfEmpty()
         }
+    }
+
+    // ---------- photos shared from other apps, and shortcuts ----------
+
+    /** What this screen was opened to do: take in shared photos, scan, or pick photos. */
+    private fun handleStart(intent: Intent) {
+        val shared = sharedImages(intent)
+        if (shared != null) {
+            receive(shared)
+            return
+        }
+        if (busy) return
+        val start = intent.getStringExtra(EXTRA_START)
+        when {
+            intent.action == ACTION_SCAN || start == START_SCAN -> scan()
+            intent.action == ACTION_PHOTOS || start == START_PHOTOS -> pickPhotos.launch("image/*")
+        }
+    }
+
+    /**
+     * The photos in a share from another app, or null when [intent] isn't a share. Only other
+     * apps' content is taken: a file path, or one of DocNest's own files, could make it read its
+     * own private data into a scan.
+     */
+    private fun sharedImages(intent: Intent): List<Uri>? {
+        val streams = when (intent.action) {
+            Intent.ACTION_SEND ->
+                listOfNotNull(IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java))
+            Intent.ACTION_SEND_MULTIPLE ->
+                IntentCompat.getParcelableArrayListExtra(intent, Intent.EXTRA_STREAM, Uri::class.java).orEmpty()
+            else -> return null
+        }
+        // Some apps put the photos only in the clip.
+        val clip = intent.clipData
+        val all = streams.ifEmpty {
+            if (clip == null) emptyList() else (0 until clip.itemCount).mapNotNull { clip.getItemAt(it).uri }
+        }
+        return all.filter { it.scheme == ContentResolver.SCHEME_CONTENT && it.authority != "$packageName.files" }
+            .distinct()
+            .take(MAX_SHARED)
+    }
+
+    /** Photos shared from another app: a new scan, or more pages for the unfinished one if the user wants. */
+    private fun receive(uris: List<Uri>) {
+        if (uris.isEmpty()) {
+            Toast.makeText(this, "DocNest makes PDFs from photos, and none came with what was shared.", Toast.LENGTH_LONG).show()
+            leaveIfEmpty()
+            return
+        }
+        savedSheet?.dismiss()
+        if (busy) {
+            waitingShare = (waitingShare.orEmpty() + uris).distinct()
+            note("The shared photos will be added when this is finished.", long = true)
+            return
+        }
+        // Pages already in a saved PDF are a finished scan: the shared photos start a new one.
+        batch.clearIfSaved()
+        refresh()
+        val n = batch.items.size
+        if (n == 0) {
+            addFromGallery(uris)
+            return
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle("Add to Your Unfinished Scan?")
+            .setMessage(
+                "You have a scan of ${pages(n)} that isn't saved yet. Add the ${photos(uris.size)} to it, " +
+                    "or start a new scan? A new scan deletes those ${pages(n)}."
+            )
+            .setPositiveButton("Add to it") { _, _ -> addFromGallery(uris) }
+            .setNegativeButton("Start new") { _, _ ->
+                batch.clear()
+                PdfJob.reset()
+                refresh()
+                addFromGallery(uris)
+            }
+            .setNeutralButton("Cancel", null)
+            .show()
+    }
+
+    private fun takeWaitingShare() {
+        val waiting = waitingShare ?: return
+        if (busy) return
+        waitingShare = null
+        receive(waiting)
     }
 
     // ---------- discarding ----------
@@ -497,7 +748,7 @@ class ReviewActivity : AppCompatActivity(), PhotoAdapter.Listener {
             .setPositiveButton("Discard") { _, _ ->
                 batch.clear()
                 PdfJob.reset()
-                finish()
+                goHome()
             }
             .setNegativeButton("Cancel", null)
             .show()
@@ -531,7 +782,7 @@ class ReviewActivity : AppCompatActivity(), PhotoAdapter.Listener {
         PdfJob.start(
             this,
             PdfJob.Request(
-                pages = batch.items.map { PdfJob.Page(batch.photoFile(it), it.rot) },
+                pages = batch.items.map { PdfJob.Page(batch.photoFile(it), it.rot, it.crop?.copyOf()) },
                 pagesKey = batch.pagesKey(),
                 quality = settings.quality,
                 colour = settings.colour,
@@ -545,39 +796,64 @@ class ReviewActivity : AppCompatActivity(), PhotoAdapter.Listener {
     }
 
     /**
-     * The sheet that slides up when the PDF is made: Share, Open, or Done. Done goes back to
-     * My documents; swiping the sheet away stays here, to make the PDF again another way.
+     * The sheet that slides up when the PDF is made: Share, Open, Rename, or Done. Done goes back
+     * to My documents; swiping the sheet away stays here, to make the PDF again another way.
      */
     private fun showSaved(d: PdfJob.Done) {
         savedSheet?.dismiss()
         val sheet = BottomSheetDialog(this)
         val v = layoutInflater.inflate(R.layout.sheet_saved, null)
         sheet.setContentView(v)
-        val saved = d.saved
         val size = fmtBytes(d.file.length())
+        val nameView = v.findViewById<TextView>(R.id.savedName)
+        val renameBtn = v.findViewById<View>(R.id.renameBtn)
 
-        v.findViewById<TextView>(R.id.savedTitle).text = if (saved != null) "PDF Saved" else "PDF Ready"
-        v.findViewById<TextView>(R.id.savedName).text = saved?.name ?: d.file.name
+        fun showName() {
+            nameView.text = d.saved?.name ?: d.file.name
+            renameBtn.isVisible = d.saved != null
+        }
+
+        val filed = d.saved != null
+        v.findViewById<TextView>(R.id.savedTitle).text = if (filed) "PDF Saved" else "PDF Ready"
         v.findViewById<TextView>(R.id.savedMeta).text =
-            if (saved != null) "${pages(d.pages)} · $size · ${Library.savedIn}"
+            if (filed) "${pages(d.pages)} · $size · ${Library.savedIn}"
             else "${pages(d.pages)} · $size. It couldn't be saved to My documents, so share it now to keep it."
-        v.findViewById<View>(R.id.savedNote).isVisible = saved != null && d.textMissing
+        v.findViewById<View>(R.id.savedNote).isVisible = filed && d.textMissing
+        showName()
 
-        v.findViewById<View>(R.id.shareBtn).setOnClickListener { share(d.file) }
+        // A toast: a note on the screen behind would be hidden by the sheet.
+        fun toast(text: String) = Toast.makeText(this, text, Toast.LENGTH_LONG).show()
+
+        renameBtn.setOnClickListener {
+            val doc = d.saved ?: return@setOnClickListener
+            askRename(doc, ::toast) { renamed ->
+                d.saved = renamed
+                showName()
+            }
+        }
+        // The saved file goes, under the name it has now; the copy in the cache only if it couldn't be saved.
+        v.findViewById<View>(R.id.shareBtn).setOnClickListener {
+            val doc = d.saved
+            try {
+                startActivity(if (doc != null) Library.shareIntent(doc) else shareIntent(d.file))
+            } catch (e: ActivityNotFoundException) {
+                toast("No app on this phone can share PDFs.")
+            }
+        }
         v.findViewById<View>(R.id.openBtn).apply {
-            isVisible = saved != null
+            isVisible = filed
             setOnClickListener {
+                val doc = d.saved ?: return@setOnClickListener
                 try {
-                    startActivity(Library.openIntent(saved!!))
+                    startActivity(Library.openIntent(doc))
                 } catch (e: ActivityNotFoundException) {
-                    // A toast: a note on the screen behind would be hidden by the sheet.
-                    Toast.makeText(context, "No app on this phone can open PDFs. Install a PDF viewer, such as Google Drive.", Toast.LENGTH_LONG).show()
+                    toast("No app on this phone can open PDFs. Install a PDF viewer, such as Google Drive.")
                 }
             }
         }
         v.findViewById<View>(R.id.doneBtn).setOnClickListener {
             sheet.dismiss()
-            finish()
+            goHome()
         }
         sheet.behavior.state = BottomSheetBehavior.STATE_EXPANDED
         sheet.behavior.skipCollapsed = true
@@ -585,15 +861,18 @@ class ReviewActivity : AppCompatActivity(), PhotoAdapter.Listener {
         savedSheet = sheet
     }
 
-    private fun share(file: File) {
+    private fun shareIntent(file: File): Intent {
         val uri = FileProvider.getUriForFile(this, "$packageName.files", file)
         val send = Intent(Intent.ACTION_SEND)
             .setType("application/pdf")
             .putExtra(Intent.EXTRA_STREAM, uri)
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        startActivity(Intent.createChooser(send, "Share PDF"))
+        return Intent.createChooser(send, "Share PDF")
     }
 }
+
+// The page viewer's picture: as large as most phone screens show.
+private const val VIEW_EDGE = 1600
 
 fun pages(n: Int) = if (n == 1) "1 page" else "$n pages"
 

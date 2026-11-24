@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The 24-unit scan icon, doubled and centred in the 108-unit icon canvas (inside its 66-unit safe zone). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="2"
+        android:scaleY="2"
+        android:translateX="30"
+        android:translateY="30">
+        <path
+            android:pathData="M3,8h3.5l2,-3h7l2,3H21v11H3zM8.4,13a3.6,3.6 0,1 0,7.2 0a3.6,3.6 0,1 0,-7.2 0"
+            android:strokeWidth="2"
+            android:strokeColor="#0A7453"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+    </group>
+</vector>

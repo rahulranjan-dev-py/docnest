@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  One page, large, as it will look in the PDF. Pinch or double-tap to zoom; swipe for the other
+  pages. Rotate, crop, retake or delete it below; Move puts it elsewhere in the PDF.
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
@@ -8,11 +12,12 @@
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="56dp"
+        android:layout_height="wrap_content"
         android:gravity="center_vertical"
+        android:minHeight="56dp"
         android:orientation="horizontal"
         android:paddingStart="4dp"
-        android:paddingEnd="16dp">
+        android:paddingEnd="8dp">
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/vClose"
@@ -23,25 +28,67 @@
             app:icon="@drawable/ic_close"
             app:iconTint="?attr/colorOnSurface" />
 
-        <TextView
-            android:id="@+id/viewTitle"
+        <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="4dp"
             android:layout_weight="1"
-            android:accessibilityLiveRegion="polite"
-            android:textAppearance="?attr/textAppearanceTitleMedium"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/viewTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:accessibilityLiveRegion="polite"
+                android:textAppearance="?attr/textAppearanceTitleMedium"
+                android:textColor="?attr/colorOnSurface" />
+
+            <TextView
+                android:id="@+id/viewSub"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textAppearance="?attr/textAppearanceBodySmall"
+                android:textColor="?attr/colorOnSurfaceVariant" />
+        </LinearLayout>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/vMove"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="Move this page"
+            android:maxLines="1"
+            android:text="Move"
             android:textColor="?attr/colorOnSurface" />
     </LinearLayout>
 
-    <ImageView
+    <com.docnest.app.ZoomImageView
         android:id="@+id/viewImg"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_margin="12dp"
+        android:layout_margin="8dp"
         android:layout_weight="1"
-        android:contentDescription="Page"
-        android:scaleType="fitCenter" />
+        android:contentDescription="Page" />
+
+    <!-- Only for a page the sharpness check doubts -->
+    <TextView
+        android:id="@+id/vNote"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="4dp"
+        android:background="@drawable/bg_warn"
+        android:gravity="center"
+        android:paddingStart="14dp"
+        android:paddingTop="6dp"
+        android:paddingEnd="14dp"
+        android:paddingBottom="6dp"
+        android:text="This photo may be blurry. Tap Retake to take it again."
+        android:textAppearance="?attr/textAppearanceBodyMedium"
+        android:textColor="@color/on_warn_container"
+        android:visibility="gone" />
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -52,22 +99,22 @@
         android:paddingBottom="8dp">
 
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/vEarlier"
-            style="@style/Widget.DocNest.ViewerAction"
-            android:text="Earlier"
-            app:icon="@drawable/ic_left" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/vLater"
-            style="@style/Widget.DocNest.ViewerAction"
-            android:text="Later"
-            app:icon="@drawable/ic_right" />
-
-        <com.google.android.material.button.MaterialButton
             android:id="@+id/vRot"
             style="@style/Widget.DocNest.ViewerAction"
             android:text="Rotate"
             app:icon="@drawable/ic_rotate" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/vCrop"
+            style="@style/Widget.DocNest.ViewerAction"
+            android:text="Crop"
+            app:icon="@drawable/ic_crop" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/vRetake"
+            style="@style/Widget.DocNest.ViewerAction"
+            android:text="Retake"
+            app:icon="@drawable/ic_camera" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/vDel"

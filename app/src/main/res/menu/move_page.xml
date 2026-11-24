@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Behind Move in the page viewer. -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/moveEarlier"
+        android:title="One page earlier" />
+    <item
+        android:id="@+id/moveLater"
+        android:title="One page later" />
+    <item
+        android:id="@+id/moveFirst"
+        android:title="To the start" />
+    <item
+        android:id="@+id/moveLast"
+        android:title="To the end" />
+</menu>

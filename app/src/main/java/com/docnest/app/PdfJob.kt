@@ -26,8 +26,8 @@ import java.io.FileOutputStream
  * from pausing the work and shows it in the notification shade.
  */
 object PdfJob {
-    /** One page for the PDF: a stored photo and how far it is turned. */
-    class Page(val photo: File, val rot: Int)
+    /** One page for the PDF: a stored photo, how far it is turned and how it is cropped. */
+    class Page(val photo: File, val rot: Int, val crop: FloatArray? = null)
 
     /**
      * Everything a PDF is made from, copied when Save PDF is tapped. [key]: see [Done.key].
@@ -56,7 +56,11 @@ object PdfJob {
      * shared again without rebuilding. [saved] is null when it couldn't be filed in My documents.
      * [textMissing]: it was meant to be searchable, but no page could be read.
      */
-    class Done(val file: File, val key: String, val saved: Doc?, val pages: Int, val textMissing: Boolean) : State {
+    class Done(val file: File, val key: String, saved: Doc?, val pages: Int, val textMissing: Boolean) : State {
+        /** The PDF in My documents, or null when it couldn't be filed there. Renaming it updates this. */
+        @Volatile
+        var saved: Doc? = saved
+
         /** Set once a screen has told the user. */
         @Volatile
         var seen = false
@@ -122,7 +126,7 @@ object PdfJob {
                 r.pages.forEachIndexed { i, p ->
                     currentCoroutineContext().ensureActive()
                     _state.value = Running(stepText(r, i), i.toFloat() / n)
-                    val bmp = Images.load(p.photo, edge, p.rot, r.colour)
+                    val bmp = Images.load(p.photo, edge, p.rot, r.colour, p.crop)
                         ?: error("Page ${i + 1} could not be opened")
                     val lines = recognizer?.let { Ocr.lines(it, bmp) }
                     if (r.searchable && lines == null) unread++

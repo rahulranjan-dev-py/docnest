@@ -4,6 +4,9 @@
         android:id="@+id/actionShare"
         android:title="Share" />
     <item
+        android:id="@+id/actionPrint"
+        android:title="Print" />
+    <item
         android:id="@+id/actionRename"
         android:title="Rename" />
     <item

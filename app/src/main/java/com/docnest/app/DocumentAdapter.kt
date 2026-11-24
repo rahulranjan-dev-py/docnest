@@ -45,6 +45,7 @@ class DocumentAdapter(
     private var docs: List<Doc> = emptyList()
     private var favourites: Set<String> = emptySet()
     private var selected: Set<String> = emptySet()
+    private var textHits: Set<String> = emptySet()
     private val selecting get() = selected.isNotEmpty()
     private val thumbWidth = (56 * context.resources.displayMetrics.density).toInt()
     private val dateFormat = SimpleDateFormat("d MMM yyyy", Locale.getDefault())
@@ -56,10 +57,12 @@ class DocumentAdapter(
 
     private fun previewKey(d: Doc) = "${d.key}:${d.size}"
 
-    fun submit(list: List<Doc>, favs: Set<String>, picked: Set<String>) {
+    /** [hits]: documents found by the words inside them rather than by name; their rows say so. */
+    fun submit(list: List<Doc>, favs: Set<String>, picked: Set<String>, hits: Set<String> = emptySet()) {
         docs = list
         favourites = favs
         selected = picked
+        textHits = hits
         notifyDataSetChanged()
     }
 
@@ -71,6 +74,7 @@ class DocumentAdapter(
         val star: MaterialButton = v.findViewById(R.id.star)
         val more: View = v.findViewById(R.id.more)
         val check: ImageView = v.findViewById(R.id.check)
+        val found: View = v.findViewById(R.id.found)
         var loading: Job? = null
     }
 
@@ -130,6 +134,7 @@ class DocumentAdapter(
 
         val cached = previews.get(previewKey(d))
         h.meta.text = meta(d, cached?.pages ?: 0)
+        h.found.visibility = if (d.key in textHits) View.VISIBLE else View.GONE
         h.thumb.setImageBitmap(cached?.firstPage)
         h.loading?.cancel()
         if (cached == null) {

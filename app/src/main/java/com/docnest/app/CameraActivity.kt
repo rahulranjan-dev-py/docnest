@@ -1,12 +1,14 @@
 package com.docnest.app
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.os.Bundle
 import android.util.Size
+import android.view.HapticFeedbackConstants
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.OrientationEventListener
@@ -38,11 +40,21 @@ import java.util.concurrent.Executors
 /**
  * Shoots photo after photo with no confirm screen in between.
  * Each shot is saved into the scan in the background while the next one is taken.
+ * Opened with [retakeIntent], it takes one photo to replace a page, then closes.
  */
 class CameraActivity : AppCompatActivity() {
 
     companion object {
         const val EXTRA_ADDED = "added"
+
+        /** After a retake: the new photo's id. */
+        const val EXTRA_NEW_ID = "newId"
+        private const val EXTRA_REPLACE = "replace"
+        private const val EXTRA_PAGE = "page"
+
+        /** Takes one photo to put in place of [photo], which is page [page] of the scan. */
+        fun retakeIntent(context: Context, photo: Photo, page: Int): Intent =
+            Intent(context, CameraActivity::class.java).putExtra(EXTRA_REPLACE, photo.id).putExtra(EXTRA_PAGE, page)
     }
 
     private lateinit var batch: Batch
@@ -62,6 +74,10 @@ class CameraActivity : AppCompatActivity() {
     private var added = 0
     private var closing = false
     private var torchOn = false
+
+    // Retaking one page: its photo's id, and its page number for the labels.
+    private var replaceId: String? = null
+    private var replacePage = 0
 
     private val askCamera = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) {
@@ -101,6 +117,13 @@ class CameraActivity : AppCompatActivity() {
         lastThumb = findViewById(R.id.lastThumb)
         shutter = findViewById(R.id.shutter)
         torchBtn = findViewById(R.id.torchBtn)
+
+        replaceId = intent.getStringExtra(EXTRA_REPLACE)
+        replacePage = intent.getIntExtra(EXTRA_PAGE, 0)
+        if (replaceId != null) {
+            findViewById<View>(R.id.doneBtn).visibility = View.INVISIBLE
+            status.text = "Take the new photo of page $replacePage"
+        }
 
         shutter.isEnabled = false
         shutter.setOnClickListener { shoot() }
@@ -198,6 +221,9 @@ class CameraActivity : AppCompatActivity() {
     private fun shoot() {
         val ic = imageCapture ?: return
         if (closing) return
+        // A retake is one photo: the next shot waits until this one has failed.
+        if (replaceId != null && pending > 0) return
+        shutter.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
         val p = batch.newPhoto()
         val shot = File(cacheDir, "shot_${p.id}.jpg")
         pending++
@@ -227,6 +253,20 @@ class CameraActivity : AppCompatActivity() {
 
     private fun saved(p: Photo, stored: Images.Stored?) {
         pending--
+        val replacing = replaceId
+        if (replacing != null && stored != null) {
+            p.blurry = stored.blurry
+            val old = batch.items.firstOrNull { it.id == replacing }
+            if (old != null) {
+                batch.replace(old, p)
+            } else {
+                batch.items.add(p)
+                batch.save()
+            }
+            setResult(RESULT_OK, Intent().putExtra(EXTRA_NEW_ID, p.id))
+            finish()
+            return
+        }
         if (stored != null) {
             p.blurry = stored.blurry
             batch.items.add(p)
@@ -248,6 +288,10 @@ class CameraActivity : AppCompatActivity() {
     }
 
     private fun updateCount() {
+        if (replaceId != null) {
+            countText.text = "Retake page $replacePage" + if (pending > 0) ", saving" else ""
+            return
+        }
         val n = batch.items.size
         countText.text = pages(n) + if (pending > 0) ", saving $pending" else ""
     }

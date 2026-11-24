@@ -6,8 +6,15 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 
-/** One page of the batch. [blurry]: the sharpness check thinks it may be out of focus. */
-class Photo(val id: String, var rot: Int = 0, var blurry: Boolean = false)
+/**
+ * One page of the scan. [rot]: turned clockwise by this many degrees. [blurry]: the sharpness
+ * check thinks it may be out of focus. [crop]: the part of the photo to keep (see [Crop]), or
+ * null for all of it.
+ */
+class Photo(val id: String, var rot: Int = 0, var blurry: Boolean = false, var crop: FloatArray? = null) {
+    /** What the page looks like: which photo, which way up, how cropped. Changes when any of them does. */
+    fun shapeKey(): String = "$id:$rot" + (crop?.let { ":" + Crop.tag(it) } ?: "")
+}
 
 /**
  * The scan in progress: its photos, in PDF order. They stay on the phone until the scan is saved
@@ -27,13 +34,25 @@ class Batch private constructor(context: Context) {
 
     fun save() {
         val arr = JSONArray()
-        items.forEach { arr.put(JSONObject().put("id", it.id).put("rot", it.rot).put("blurry", it.blurry)) }
+        items.forEach { p ->
+            val o = JSONObject().put("id", p.id).put("rot", p.rot).put("blurry", p.blurry)
+            p.crop?.let { c -> o.put("crop", JSONArray().apply { c.forEach { put(it.toDouble()) } }) }
+            arr.put(o)
+        }
         val tmp = File(index.path + ".tmp")
         tmp.writeText(arr.toString())
         if (!tmp.renameTo(index)) {
             index.delete()
             tmp.renameTo(index)
         }
+    }
+
+    /** Puts [new] where [old] was (a page taken again), and deletes [old]'s files. */
+    fun replace(old: Photo, new: Photo) {
+        val i = items.indexOfFirst { it.id == old.id }
+        if (i >= 0) items[i] = new else items.add(new)
+        save()
+        deleteFiles(old)
     }
 
     /** Deletes the files of a photo that is no longer in the batch. */
@@ -49,8 +68,8 @@ class Batch private constructor(context: Context) {
         prefs.edit { remove(KEY_SAVED) }
     }
 
-    /** Which pages, and which way up each is: what a PDF is made from. */
-    fun pagesKey(): String = items.joinToString(",") { "${it.id}:${it.rot}" }
+    /** Which pages, which way up and how cropped: what a PDF is made from. */
+    fun pagesKey(): String = items.joinToString(",") { it.shapeKey() }
 
     /** Remembers that the pages in [key] are now in a saved PDF. Safe from any thread. */
     fun markSaved(key: String) = prefs.edit { putString(KEY_SAVED, key) }
@@ -61,17 +80,21 @@ class Batch private constructor(context: Context) {
      * look, say) for as long as the scan's own screen stays open.
      */
     fun clearIfSaved(): Boolean {
-        if (items.isEmpty() || prefs.getString(KEY_SAVED, null) != pagesKey()) return false
+        if (!isSaved()) return false
         clear()
         return true
     }
+
+    /** True when these pages, exactly as they are now, are already in a saved PDF. */
+    fun isSaved(): Boolean = items.isNotEmpty() && prefs.getString(KEY_SAVED, null) == pagesKey()
 
     private fun load() {
         runCatching {
             val arr = JSONArray(index.readText())
             for (i in 0 until arr.length()) {
                 val o = arr.getJSONObject(i)
-                val p = Photo(o.getString("id"), o.optInt("rot", 0), o.optBoolean("blurry", false))
+                val crop = o.optJSONArray("crop")?.let { a -> Crop.parse((0 until a.length()).map { a.optDouble(it) }) }
+                val p = Photo(o.getString("id"), o.optInt("rot", 0), o.optBoolean("blurry", false), crop)
                 if (photoFile(p).exists() && thumbFile(p).exists()) items.add(p)
             }
         }

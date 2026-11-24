@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- One page: tap it to see it large; rotate or delete below. Hold and drag to reorder. -->
+<!-- One page: tap it to see it large; rotate, crop or delete below. Hold and drag to reorder. -->
 <com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     style="@style/Widget.Material3.CardView.Outlined"
@@ -76,6 +76,20 @@
                 android:layout_height="wrap_content"
                 android:contentDescription="Rotate"
                 app:icon="@drawable/ic_rotate"
+                app:iconTint="?attr/colorOnSurface" />
+
+            <Space
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_weight="1" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/cropBtn"
+                style="@style/Widget.DocNest.IconButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:contentDescription="Crop"
+                app:icon="@drawable/ic_crop"
                 app:iconTint="?attr/colorOnSurface" />
 
             <Space

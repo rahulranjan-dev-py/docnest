@@ -85,6 +85,15 @@
                     android:text="Select all" />
 
                 <com.google.android.material.button.MaterialButton
+                    android:id="@+id/shareSelBtn"
+                    style="@style/Widget.DocNest.IconButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:contentDescription="Share the selected documents"
+                    app:icon="@drawable/ic_share"
+                    app:iconTint="?attr/colorOnSurface" />
+
+                <com.google.android.material.button.MaterialButton
                     android:id="@+id/deleteSelBtn"
                     style="@style/Widget.DocNest.IconButton"
                     android:layout_width="wrap_content"
@@ -232,13 +241,20 @@
                 android:singleLine="true" />
         </com.google.android.material.textfield.TextInputLayout>
 
-        <com.google.android.material.chip.ChipGroup
-            android:id="@+id/filter"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
             android:paddingStart="16dp"
             android:paddingTop="6dp"
-            android:paddingEnd="16dp"
+            android:paddingEnd="4dp">
+
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/filter"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
             app:selectionRequired="true"
             app:singleLine="true"
             app:singleSelection="true">
@@ -258,6 +274,18 @@
                 android:layout_height="wrap_content"
                 android:text="Favourites" />
         </com.google.android.material.chip.ChipGroup>
+
+            <!-- How the list is ordered: newest, oldest, by name or by size -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/sortBtn"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:maxLines="1"
+                android:textColor="?attr/colorOnSurface"
+                app:icon="@drawable/ic_sort"
+                app:iconTint="?attr/colorOnSurfaceVariant" />
+        </LinearLayout>
 
         <!-- Pages scanned but not saved yet, or a PDF being made: tap to go back to them -->
         <com.google.android.material.card.MaterialCardView

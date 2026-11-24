@@ -70,6 +70,24 @@
         <item name="iconGravity">textStart</item>
     </style>
 
+    <!-- The quieter button on the always-dark screens (camera, crop). -->
+    <style name="Widget.DocNest.DockButton.OnDark" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="android:layout_height">56dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:paddingStart">16dp</item>
+        <item name="android:paddingEnd">16dp</item>
+        <item name="android:textSize">16sp</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:textColor">#FFFFFF</item>
+        <item name="iconTint">#FFFFFF</item>
+        <item name="backgroundTint">@android:color/transparent</item>
+        <item name="strokeColor">#7C8983</item>
+        <item name="cornerRadius">18dp</item>
+        <item name="iconGravity">textStart</item>
+    </style>
+
     <!-- One choice in a row of choices; the selected one turns green. -->
     <style name="Widget.DocNest.Segment" parent="Widget.Material3.Button.OutlinedButton">
         <item name="android:layout_width">0dp</item>
