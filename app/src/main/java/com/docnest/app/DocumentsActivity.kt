@@ -1,11 +1,8 @@
 package com.docnest.app
 
 import android.content.ActivityNotFoundException
-import android.content.DialogInterface
 import android.os.Bundle
 import android.view.View
-import android.view.WindowManager
-import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import android.widget.PopupMenu
 import android.widget.TextView
@@ -24,7 +21,6 @@ import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
-import com.google.android.material.textfield.TextInputLayout
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -34,9 +30,10 @@ import java.io.File
 /**
  * Home: every PDF DocNest has made, with Scan and Photos along the bottom.
  *
- * Tap a document to open it; star to favourite; ⋮ to share, rename, select or delete. Hold a
- * document to start selecting several, then delete them together. Deleting is undoable: the rows
- * disappear at once, and the files go when the Undo note does (or when this screen is left).
+ * Tap a document to open it; star to favourite; ⋮ to share, print, rename, select or delete.
+ * Hold a document to start selecting several, then share or delete them together. Deleting is
+ * undoable: the rows disappear at once, and the files go when the Undo note does (or when this
+ * screen is left). The list can be ordered by date, name or size.
  *
  * A scan that isn't saved yet, or a PDF being made, shows as a card above the list.
  * The launcher opens this screen under its old name, .MainActivity (see the manifest).
@@ -55,6 +52,7 @@ class DocumentsActivity : AppCompatActivity(), DocumentAdapter.Listener {
     private lateinit var emptyAction: MaterialButton
     private lateinit var chipAll: Chip
     private lateinit var chipFavourites: Chip
+    private lateinit var sortBtn: MaterialButton
     private lateinit var draftCard: View
     private lateinit var draftTitle: TextView
     private lateinit var draftText: TextView
@@ -108,6 +106,7 @@ class DocumentsActivity : AppCompatActivity(), DocumentAdapter.Listener {
         emptyAction = findViewById(R.id.emptyAction)
         chipAll = findViewById(R.id.chipAll)
         chipFavourites = findViewById(R.id.chipFavourites)
+        sortBtn = findViewById(R.id.sortBtn)
         draftCard = findViewById(R.id.draftCard)
         draftTitle = findViewById(R.id.draftTitle)
         draftText = findViewById(R.id.draftText)
@@ -121,6 +120,8 @@ class DocumentsActivity : AppCompatActivity(), DocumentAdapter.Listener {
             render()
         }
         findViewById<View>(R.id.deleteSelBtn).setOnClickListener { deleteSelected() }
+        findViewById<View>(R.id.shareSelBtn).setOnClickListener { share(all.filter { it.key in selected }) }
+        sortBtn.setOnClickListener { chooseSort() }
         findViewById<EditText>(R.id.searchIn).doAfterTextChanged {
             typed = it?.toString()?.trim()?.lowercase().orEmpty()
             search()
@@ -180,7 +181,7 @@ class DocumentsActivity : AppCompatActivity(), DocumentAdapter.Listener {
                     if (saved == null) {
                         note("The PDF was made, but couldn't be saved. Open the scan and tap Share PDF.", long = true)
                     } else {
-                        note("Saved ${saved.name} (${fmtBytes(s.file.length())})", long = true, action = "Share" to { share(saved) })
+                        note("Saved ${saved.name} (${fmtBytes(s.file.length())})", long = true, action = "Share" to { share(listOf(saved)) })
                     }
                 }
                 PdfJob.Failed -> {
@@ -251,7 +252,10 @@ class DocumentsActivity : AppCompatActivity(), DocumentAdapter.Listener {
 
     private fun render() {
         val favs = Library.favourites(this)
-        val present = all.filter { it.key !in pendingDeletes }
+        val order = Library.sort(this)
+        sortBtn.text = order.label
+        sortBtn.contentDescription = "Order: ${order.menuLabel.lowercase()}. Change the order"
+        val present = Library.sorted(all.filter { it.key !in pendingDeletes }, order)
         val starred = present.filter { it.key in favs }
         chipAll.text = "All ${present.size}"
         chipFavourites.text = "Favourites ${starred.size}"
@@ -262,7 +266,10 @@ class DocumentsActivity : AppCompatActivity(), DocumentAdapter.Listener {
         }
         // A document that is gone (deleted here or in another app) can't stay selected.
         selected.retainAll(present.map { it.key }.toSet())
-        adapter.submit(shown, favs, selected.toSet())
+        // Found by the words inside, not by name: the row says so, or the match would puzzle.
+        val hits = if (query.isEmpty()) emptySet() else
+            shown.filter { it.key in textMatches && !it.name.lowercase().contains(query) }.map { it.key }.toSet()
+        adapter.submit(shown, favs, selected.toSet(), hits)
 
         val selecting = selected.isNotEmpty()
         normalBar.isVisible = !selecting
@@ -340,8 +347,9 @@ class DocumentsActivity : AppCompatActivity(), DocumentAdapter.Listener {
             inflate(R.menu.document_actions)
             setOnMenuItemClickListener { item ->
                 when (item.itemId) {
-                    R.id.actionShare -> share(doc)
-                    R.id.actionRename -> askRename(doc)
+                    R.id.actionShare -> share(listOf(doc))
+                    R.id.actionPrint -> if (!Printing.print(this@DocumentsActivity, doc)) note("This phone can't print.")
+                    R.id.actionRename -> askRename(doc, { note(it, long = true) }) { renamed(doc, it) }
                     R.id.actionSelect -> onSelect(doc)
                     R.id.actionDelete -> delete(listOf(doc))
                 }
@@ -351,11 +359,26 @@ class DocumentsActivity : AppCompatActivity(), DocumentAdapter.Listener {
         }
     }
 
-    private fun share(doc: Doc) {
+    private fun share(docs: List<Doc>) {
+        if (docs.isEmpty()) return
         try {
-            startActivity(Library.shareIntent(doc))
+            startActivity(Library.shareIntent(docs))
         } catch (e: ActivityNotFoundException) {
             note("No app on this phone can share PDFs.", long = true)
+        }
+    }
+
+    private fun chooseSort() {
+        val now = Library.sort(this)
+        PopupMenu(this, sortBtn).apply {
+            Library.Sort.entries.forEachIndexed { i, s -> menu.add(0, i, i, s.menuLabel).isChecked = s == now }
+            menu.setGroupCheckable(0, true, true)
+            setOnMenuItemClickListener { item ->
+                Library.setSort(this@DocumentsActivity, Library.Sort.entries[item.itemId])
+                render()
+                true
+            }
+            show()
         }
     }
 
@@ -388,64 +411,10 @@ class DocumentsActivity : AppCompatActivity(), DocumentAdapter.Listener {
 
     // ---------- rename ----------
 
-    private fun askRename(doc: Doc) {
-        val v = layoutInflater.inflate(R.layout.dialog_rename, null)
-        val box = v.findViewById<TextInputLayout>(R.id.nameBox)
-        val input = v.findViewById<EditText>(R.id.nameIn)
-        val current = doc.name.removeSuffix(".pdf")
-        input.setText(current)
-        input.selectAll()
-
-        val dialog = MaterialAlertDialogBuilder(this)
-            .setTitle("Rename Document")
-            .setView(v)
-            .setPositiveButton("Rename", null) // wired below, so a bad name keeps the dialog open
-            .setNegativeButton("Cancel", null)
-            .create()
-
-        // Checked as you type: the Rename button only works for a name that can be used.
-        fun check(): Boolean {
-            val problem = Library.nameProblem(input.text.toString())
-            box.error = problem
-            dialog.getButton(DialogInterface.BUTTON_POSITIVE)?.isEnabled = problem == null
-            return problem == null
-        }
-
-        fun confirm() {
-            if (!check()) return
-            val name = input.text.toString().trim()
-            dialog.dismiss()
-            if (name != current) rename(doc, name)
-        }
-
-        input.doAfterTextChanged { check() }
-        input.setOnEditorActionListener { _, id, _ ->
-            if (id == EditorInfo.IME_ACTION_DONE) {
-                confirm()
-                true
-            } else {
-                false
-            }
-        }
-        dialog.setOnShowListener {
-            dialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener { confirm() }
-            input.requestFocus()
-        }
-        dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE)
-        dialog.show()
-    }
-
-    private fun rename(doc: Doc, name: String) {
-        lifecycleScope.launch {
-            val result = withContext(Dispatchers.IO) { runCatching { Library.rename(this@DocumentsActivity, doc, name) } }
-            result.onSuccess { renamed ->
-                all = all.map { if (it.key == doc.key) renamed else it }
-                render()
-                note("Renamed to ${renamed.name}")
-            }.onFailure {
-                note((it as? Library.Failure)?.message ?: "Couldn't rename ${doc.name}. Try again.", long = true)
-            }
-        }
+    private fun renamed(old: Doc, new: Doc) {
+        all = all.map { if (it.key == old.key) new else it }
+        render()
+        note("Renamed to ${new.name}")
     }
 
     // ---------- delete, with Undo ----------

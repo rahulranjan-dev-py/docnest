@@ -1,5 +1,6 @@
 package com.docnest.app
 
+import android.content.ClipData
 import android.content.ContentUris
 import android.content.ContentValues
 import android.content.Context
@@ -15,6 +16,7 @@ import androidx.annotation.RequiresApi
 import androidx.core.content.FileProvider
 import androidx.core.content.edit
 import java.io.File
+import java.text.Collator
 
 /** A PDF made by DocNest. [key] stays the same through a rename, so favourites follow the file. */
 class Doc(val key: String, val uri: Uri, val name: String, val size: Long, val added: Long)
@@ -85,6 +87,33 @@ object Library {
         size = f.length(),
         added = f.lastModified(),
     )
+
+    // ---------- order ----------
+
+    /** How My documents is ordered. [label] goes on its button, [menuLabel] in the button's menu. */
+    enum class Sort(val label: String, val menuLabel: String) {
+        NEWEST("Newest", "Newest first"),
+        OLDEST("Oldest", "Oldest first"),
+        NAME("Name", "Name, A to Z"),
+        LARGEST("Largest", "Largest first"),
+    }
+
+    private const val KEY_SORT = "sort"
+
+    private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+
+    fun sort(context: Context): Sort =
+        Sort.entries.firstOrNull { it.name == prefs(context).getString(KEY_SORT, null) } ?: Sort.NEWEST
+
+    fun setSort(context: Context, sort: Sort) = prefs(context).edit { putString(KEY_SORT, sort.name) }
+
+    fun sorted(docs: List<Doc>, sort: Sort): List<Doc> = when (sort) {
+        Sort.NEWEST -> docs.sortedByDescending { it.added }
+        Sort.OLDEST -> docs.sortedBy { it.added }
+        // In the phone's language: accents and capitals sort the way people expect.
+        Sort.NAME -> Collator.getInstance().let { c -> docs.sortedWith { a, b -> c.compare(a.name, b.name) } }
+        Sort.LARGEST -> docs.sortedByDescending { it.size }
+    }
 
     // ---------- saving a new PDF ----------
 
@@ -219,6 +248,19 @@ object Library {
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION),
         "Share PDF",
     )
+
+    /** Shares several PDFs at once. One goes as a single file, which more apps accept. */
+    fun shareIntent(docs: List<Doc>): Intent {
+        if (docs.size == 1) return shareIntent(docs[0])
+        val uris = ArrayList(docs.map { it.uri })
+        val send = Intent(Intent.ACTION_SEND_MULTIPLE)
+            .setType(PDF)
+            .putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris)
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        // The receiving app may read only the files in the clip, so all of them go in it.
+        send.clipData = ClipData.newRawUri(null, uris[0]).apply { uris.drop(1).forEach { addItem(ClipData.Item(it)) } }
+        return Intent.createChooser(send, "Share ${docs.size} PDFs")
+    }
 
     class Preview(val firstPage: Bitmap?, val pages: Int)
 
